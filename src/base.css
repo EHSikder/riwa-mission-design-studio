@@ -1,0 +1,9 @@
+:root {
+  --mono: 'JetBrains Mono', 'Cascadia Mono', Consolas, ui-monospace, monospace;
+  --sans: 'Inter', 'Segoe UI', system-ui, sans-serif;
+}
+
+* { box-sizing: border-box; }
+html, body, #root { margin: 0; height: 100%; background: #02040a; color: #dfe7f2; font-family: var(--sans); overflow: hidden; }
+.app { position: fixed; inset: 0; }
+canvas { display: block; }
