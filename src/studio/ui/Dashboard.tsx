@@ -51,7 +51,7 @@ function IssueRow({ i }: { i: Issue }) {
   return (
     <li className={`st-issue ${i.level}`}>
       <span className="st-issue-icon" aria-label={i.level}>{i.level === 'fail' ? '✕' : i.level === 'warn' ? '!' : 'i'}</span>
-      <span className="st-issue-body">
+      <span>
         <span className={`st-role-chip ${i.role}`}>{ROLES[i.role].short}</span>
         {i.text}
         {i.fix && <span className="st-issue-fix">→ {i.fix}</span>}

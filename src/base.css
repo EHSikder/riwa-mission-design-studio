@@ -1,9 +1,11 @@
+/* The RIWA design system's type: Archivo for everything, Newsreader italic for one word of emphasis, JetBrains Mono for labels and data. */
 :root {
-  --mono: 'JetBrains Mono', 'Cascadia Mono', Consolas, ui-monospace, monospace;
-  --sans: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --sans: 'Archivo', 'Helvetica Neue', Arial, sans-serif;
+  --serif: 'Newsreader', Georgia, serif;
+  --mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Consolas, monospace;
 }
 
 * { box-sizing: border-box; }
-html, body, #root { margin: 0; height: 100%; background: #02040a; color: #dfe7f2; font-family: var(--sans); overflow: hidden; }
+html, body, #root { margin: 0; height: 100%; background: #0a0f26; color: #fff; font-family: var(--sans); overflow: hidden; }
 .app { position: fixed; inset: 0; }
 canvas { display: block; }

@@ -77,6 +77,8 @@ The built game contains only these packages (checked from the build's source map
 | @babel/runtime | 7.29.10 |
 | zustand | 5.0.15 |
 
+Typefaces, loaded from Google Fonts when the game has a connection (otherwise Helvetica or Arial): Archivo, Newsreader and JetBrains Mono, all under the SIL Open Font License 1.1.
+
 Used to build and test it, not shipped: Vite 8.3.4 (MIT), @vitejs/plugin-react 6.1.2 (MIT), Vitest 5.0.4 (MIT), TypeScript 7.0.2 (Apache-2.0).
 
 The server (`server/`) uses only Node.js itself.

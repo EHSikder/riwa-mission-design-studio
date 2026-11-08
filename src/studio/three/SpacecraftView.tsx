@@ -55,7 +55,8 @@ function cellTexture(u: number, v: number): THREE.Texture {
 /** Players who ask their system for less motion get a still model (they can still drag it). */
 const REDUCED_MOTION = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-const FOIL = { color: '#d9a62e', metalness: 0.85, roughness: 0.32 } as const;
+/** Silver multi-layer insulation over the bus. */
+const FOIL = { color: '#c9d0da', metalness: 0.85, roughness: 0.3 } as const;
 const WHITE = { color: '#e9edf2', metalness: 0.1, roughness: 0.55 } as const;
 const DARK = { color: '#1d2027', metalness: 0.4, roughness: 0.5 } as const;
 
@@ -71,7 +72,7 @@ function Part({ name, onHover, children }: { name: string; onHover: (n: string |
 }
 
 /** A parabolic dish of diameter `D`, opening toward +Y. */
-function Dish({ D, color = WHITE.color }: { D: number; color?: string }) {
+function Dish({ D }: { D: number }) {
   const pts = useMemo(() => {
     const f = 0.4 * D;
     const out: THREE.Vector2[] = [];
@@ -85,7 +86,7 @@ function Dish({ D, color = WHITE.color }: { D: number; color?: string }) {
     <group>
       <mesh>
         <latheGeometry args={[pts, 40]} />
-        <meshStandardMaterial color={color} metalness={0.15} roughness={0.5} side={THREE.DoubleSide} />
+        <meshStandardMaterial color={WHITE.color} metalness={0.15} roughness={0.5} side={THREE.DoubleSide} />
       </mesh>
       <mesh position={[0, 0.4 * D * 0.9, 0]}>
         <coneGeometry args={[D * 0.05, D * 0.12, 12]} />
@@ -128,7 +129,7 @@ function Wing({ side, area, h, w, tracking, onHover }: { side: 1 | -1; area: num
 
 function InstrumentShape({ i, id, x, y, w, h, d, onHover, index }: { i: Instrument; id: InstrumentId; x: number; y: number; w: number; h: number; d: number; onHover: (n: string | null) => void; index: number }) {
   const s = Math.cbrt(i.massKg);
-  const mat = <meshStandardMaterial color={i.color} metalness={0.3} roughness={0.45} />;
+  const mat = <meshStandardMaterial color="#175195" metalness={0.3} roughness={0.45} />;
   let body: ReactNode;
   if (i.kind === 'sar') {
     const L = Math.min(4.5, Math.max(0.5, 0.75 * s)), W = Math.min(0.8, Math.max(0.25, 0.12 * s));
@@ -143,14 +144,14 @@ function InstrumentShape({ i, id, x, y, w, h, d, onHover, index }: { i: Instrume
     const sideZ = index % 2 ? -1 : 1;
     body = (
       <group position={[0, -h * 0.15, sideZ * (d / 2 + 0.25 + D / 2)]} rotation={[sideZ * 2.2, 0, 0]}>
-        <Dish D={D} color="#f2f4f7" />
+        <Dish D={D} />
       </group>
     );
   } else if (i.kind === 'relay') {
     const D = i.proxDishM ?? 1;
     body = (
       <group position={[x, y - 0.12, 0]} rotation={[Math.PI, 0, 0]}>
-        <Dish D={D} color="#f6f1e3" />
+        <Dish D={D} />
       </group>
     );
   } else if (id === 'sharad') {

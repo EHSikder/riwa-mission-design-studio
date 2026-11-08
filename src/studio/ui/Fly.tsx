@@ -27,21 +27,33 @@ const monthLabel = (m: number) => {
   return d.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
 };
 
-/** A small line chart of one sampled quantity. */
-export function Spark({ samples, pick, label, format, color = '#5ad1ff', min }: { samples: SimSample[]; pick: (s: SimSample) => number; label: string; format: (v: number) => string; color?: string; min?: number }) {
+/** A small line chart of one sampled quantity: a sky (or accent) line over a soft fade, as the design system draws charts. */
+export function Spark({ samples, pick, label, format, color = '#60bee8' }: { samples: SimSample[]; pick: (s: SimSample) => number; label: string; format: (v: number) => string; color?: string }) {
   const W = 260, H = 64;
   const ys = samples.map(pick);
   const xs = samples.map((s) => s.day);
   const x0 = Math.min(...xs, 0), x1 = Math.max(...xs, 1);
-  const y0 = min ?? Math.min(...ys, 0), y1 = Math.max(...ys, y0 + 1e-9);
+  const y0 = 0, y1 = Math.max(...ys, 1e-9);
   const pts = xs.map((x, i) => `${(((x - x0) / (x1 - x0)) * W).toFixed(1)},${(H - ((ys[i] - y0) / (y1 - y0)) * (H - 6) - 3).toFixed(1)}`).join(' ');
   const last = ys.length ? ys[ys.length - 1] : 0;
+  const fade = `fade-${label.replace(/\W/g, '')}`;
   return (
     <figure className="st-spark">
       <figcaption><span>{label}</span><b>{format(last)}</b></figcaption>
       <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img" aria-label={`${label}: ${format(last)}`}>
+        <defs>
+          <linearGradient id={fade} x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0" stopColor={color} stopOpacity="0.28" />
+            <stop offset="1" stopColor={color} stopOpacity="0" />
+          </linearGradient>
+        </defs>
         <line x1="0" x2={W} y1={H - 0.5} y2={H - 0.5} stroke="rgba(255,255,255,0.12)" />
-        {samples.length > 1 && <polyline points={pts} fill="none" stroke={color} strokeWidth="1.8" vectorEffect="non-scaling-stroke" />}
+        {samples.length > 1 && (
+          <>
+            <polygon points={`${pts} ${W},${H} 0,${H}`} fill={`url(#${fade})`} />
+            <polyline points={pts} fill="none" stroke={color} strokeWidth="1.8" vectorEffect="non-scaling-stroke" />
+          </>
+        )}
       </svg>
     </figure>
   );
@@ -51,12 +63,12 @@ export function Charts({ run }: { run: MissionRun }) {
   const s = run.samples;
   return (
     <div className="st-charts">
-      {run.a.orbit.eclipseMin > 0 && <Spark samples={s} pick={(x) => x.soc} min={0} label="Battery left after an eclipse" format={(v) => `${v.toFixed(0)}%`} color="#4fd18b" />}
-      <Spark samples={s} pick={(x) => x.powerW} min={0} label="Solar power" format={fmt.w} color="#ffb547" />
-      {run.a.data.generatedGbitDay > 0 && <Spark samples={s} pick={(x) => x.backlogGbit} min={0} label="Data waiting on board" format={fmt.gbit} color="#ff7ad9" />}
-      {run.a.data.generatedGbitDay > 0 && <Spark samples={s} pick={(x) => x.deliveredGbit / 1000} min={0} label="Data delivered" format={(v) => `${v.toFixed(v < 10 ? 2 : 0)} Tbit`} />}
-      <Spark samples={s} pick={(x) => x.value} min={0} label="Mission value" format={(v) => `${(v * 100).toFixed(0)}`} color="#b49cff" />
-      <Spark samples={s} pick={(x) => x.spentM} min={0} label="Money spent" format={fmt.m} color="#8fd3ff" />
+      {run.a.orbit.eclipseMin > 0 && <Spark samples={s} pick={(x) => x.soc} label="Battery left after an eclipse" format={(v) => `${v.toFixed(0)}%`} />}
+      <Spark samples={s} pick={(x) => x.powerW} label="Solar power" format={fmt.w} color="#3792c2" />
+      {run.a.data.generatedGbitDay > 0 && <Spark samples={s} pick={(x) => x.backlogGbit} label="Data waiting on board" format={fmt.gbit} color="#3792c2" />}
+      {run.a.data.generatedGbitDay > 0 && <Spark samples={s} pick={(x) => x.deliveredGbit / 1000} label="Data delivered" format={(v) => `${v.toFixed(v < 10 ? 2 : 0)} Tbit`} />}
+      <Spark samples={s} pick={(x) => x.value} label="Mission value" format={(v) => `${(v * 100).toFixed(0)}`} />
+      <Spark samples={s} pick={(x) => x.spentM} label="Money spent" format={fmt.m} color="#3792c2" />
     </div>
   );
 }
@@ -113,7 +125,7 @@ function Health({ run }: { run: MissionRun }) {
     ...(Object.keys(st.health) as InstrumentId[]).map((id) => [INSTRUMENTS[id].short, st.health[id] ?? 0, `${((st.health[id] ?? 0) * 100).toFixed(0)}%`] as [string, number, string]),
   ];
   return (
-    <div className="st-health">
+    <div>
       <h3>Spacecraft health</h3>
       {rows.map(([n, v, t]) => (
         <div key={n} className={`st-health-row ${v < 0.5 ? 'bad' : v < 0.9 ? 'warn' : ''}`}>
@@ -152,9 +164,9 @@ function Decision({ run, onChange }: { run: MissionRun; onChange: () => void }) 
         <h2 id="st-dec-title">{p.title}</h2>
         <p>{p.text}</p>
         <div className="st-dec-options">
-          {p.options!.map((o) => (
+          {p.options!.map((o, k) => (
             <div key={o.id} className="st-dec-option">
-              <button type="button" onClick={() => { vote(o.id); onChange(); }}>
+              <button type="button" autoFocus={k === 0} onClick={() => { vote(o.id); onChange(); }}>
                 <b>{o.label}</b>
                 <span>{o.explain}</span>
               </button>

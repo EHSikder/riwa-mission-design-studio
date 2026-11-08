@@ -1,6 +1,6 @@
 /**
- * The studio's screens around the design desks: choosing a mission and a difficulty, the customer's brief
- * (objectives and how ambitious each requirement is), and the mission review board before launch.
+ * The studio's screens around the design desks: setting up a game (mission, difficulty, players), the
+ * customer's brief (objectives and how ambitious each requirement is), and the mission review board before launch.
  */
 import { useEffect, useState } from 'react';
 import { DIFFICULTY } from '../model/design';
@@ -16,13 +16,23 @@ import { canEdit, ownerOf } from '../model/team';
 
 const ORDER: ScenarioId[] = ['tutorial', 'angola-eo', 'geo-comms', 'lunar-relay', 'mars-orbiter'];
 
+type Step = 'mission' | 'difficulty' | 'players' | 'join';
+const STEPS: { id: Step; label: string }[] = [
+  { id: 'mission', label: 'Mission' },
+  { id: 'difficulty', label: 'Difficulty' },
+  { id: 'players', label: 'Players' },
+];
+const BACK: Partial<Record<Step, Step>> = { difficulty: 'mission', players: 'difficulty', join: 'mission' };
+
+/** Setting up a game, one decision per screen: the mission, then the difficulty, then who plays. Back (or Esc) returns. */
 export function MissionSelect() {
   const { start, host, join } = useStudio.getState();
-  const [scenario, setScenario] = useState<ScenarioId>('angola-eo');
-  const [difficulty, setDifficulty] = useState<Difficulty>('engineer');
   // a #room=CODE link opens straight on "join"
   const linked = location.hash.startsWith('#room=') ? cleanCode(location.hash.slice(6)) : '';
-  const [mode, setMode] = useState<PlayMode>(linked ? 'join' : 'solo');
+  const [step, setStep] = useState<Step>(linked ? 'join' : 'mission');
+  const [scenario, setScenario] = useState<ScenarioId>('angola-eo');
+  const [difficulty, setDifficulty] = useState<Difficulty>('engineer');
+  const [mode, setMode] = useState<PlayMode>('solo');
   const [names, setNames] = useState<string[]>(['', '']);
   const [code, setCode] = useState(linked);
   // a copy on a static host has no room server: network rooms are off there
@@ -30,77 +40,143 @@ export function MissionSelect() {
   useEffect(() => {
     roomsAvailable().then((ok) => {
       setRooms(ok);
-      if (!ok) setMode((m) => (m === 'host' || m === 'join' ? 'solo' : m));
+      if (!ok) {
+        setMode((m) => (m === 'host' ? 'solo' : m));
+        setStep((s) => (s === 'join' ? 'mission' : s));
+      }
     });
   }, []);
   const sc = SCENARIOS[scenario];
+  const at = STEPS.findIndex((s) => s.id === step);
+  const back = BACK[step];
+  const pickScenario = (id: ScenarioId) => {
+    setScenario(id);
+    // the tutorial is Cadet only; leaving it goes back to the real numbers
+    if (SCENARIOS[id].tutorial) setDifficulty('cadet');
+    else if (sc.tutorial) setDifficulty('engineer');
+  };
   const go = () => {
     const named = names.map((n, i) => n.trim() || `Player ${i + 1}`);
-    if (mode === 'solo') start({ scenario, difficulty, mode: 'solo', names: ['You'] });
+    if (step === 'join') join(code, named[0]);
+    else if (mode === 'solo') start({ scenario, difficulty, mode: 'solo', names: ['You'] });
     else if (mode === 'hotseat') start({ scenario, difficulty, mode: 'hotseat', names: named });
-    else if (mode === 'host') host({ scenario, difficulty, name: named[0] });
-    else if (code.length >= 3) join(code, named[0]);
+    else host({ scenario, difficulty, name: named[0] });
   };
   return (
-    <div className="st-select">
-      <header className="st-hero">
-        <p className="st-small-note">This game is at its best on a laptop or desktop. It works on a phone, with more scrolling.</p>
-        <div className="st-kicker">NASA Space Apps 2026 · Space Mission Design Game</div>
-        <h1>Mission Design Studio</h1>
-        <p>
-          Pick a mission. Decide what it is for, design the spacecraft, choose the orbit and the rocket, and keep six resources in
-          balance: mass, power, money, data, communications and time. Then fly it, and find out what happened, and why.
-        </p>
+    <div className="st-setup" onKeyDown={(e) => { if (e.key === 'Escape' && back) setStep(back); }}>
+      <header className="st-setup-head">
+        <div className="st-brand"><b>RIWA</b><span>Mission Design Studio</span></div>
+        {step !== 'join' && (
+          <ol className="st-setup-steps" aria-label="Setting up the game">
+            {STEPS.map((s, k) => (
+              <li key={s.id}>
+                <button type="button" className={k === at ? 'on' : k < at ? 'done' : ''} disabled={k > at} aria-current={k === at ? 'step' : undefined} onClick={() => setStep(s.id)}>
+                  <span>{String(k + 1).padStart(2, '0')}</span>{s.label}
+                </button>
+              </li>
+            ))}
+          </ol>
+        )}
       </header>
-      <div className="st-scen-grid" role="radiogroup" aria-label="Mission">
-        {ORDER.map((id) => {
-          const s = SCENARIOS[id];
-          return (
-            <button
-              key={id}
-              type="button"
-              role="radio"
-              aria-checked={scenario === id}
-              className={`st-scen ${scenario === id ? 'on' : ''} body-${s.tutorial ? 'tutorial' : s.body}`}
-              onClick={() => {
-                setScenario(id);
-                // the tutorial is Cadet only; leaving it goes back to the real numbers
-                if (s.tutorial) setDifficulty('cadet');
-                else if (sc.tutorial) setDifficulty('engineer');
-              }}
-            >
-              <span className="st-scen-art" aria-hidden />
-              <span className="st-scen-name">{s.name}</span>
-              <span className="st-scen-tag">{s.tagline}</span>
-              <span className="st-scen-meta">{s.tutorial ? 'Tutorial · 10 minutes' : `${fmt.m(s.budgetM)} · launch within ${s.deadlineMonths} months`}</span>
-              <span className="st-scen-crit">
-                {s.critical.map((r: ResourceId) => <span key={r}><ResourceIcon id={r} /> {RESOURCES[r].name}</span>)}
-              </span>
-            </button>
-          );
-        })}
+
+      <div key={step} className="st-setup-body st-reveal">
+        {step === 'mission' && (
+          <>
+            <p className="st-small-note">This game is at its best on a laptop or desktop. It works on a phone, with more scrolling.</p>
+            <div className="st-kicker">NASA Space Apps 2026 · Space Mission Design Game</div>
+            <h1>Choose your <em>mission</em>.</h1>
+            <p className="st-lead">
+              Decide what it is for, design the spacecraft, choose the orbit and the rocket, and keep six resources in balance: mass,
+              power, money, data, communications and time. Then fly it, and find out what happened, and why.
+            </p>
+            <div className="st-scen-grid" role="radiogroup" aria-label="Mission">
+              {ORDER.map((id) => {
+                const s = SCENARIOS[id];
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    role="radio"
+                    aria-checked={scenario === id}
+                    autoFocus={scenario === id}
+                    className={`st-scen ${scenario === id ? 'on' : ''} body-${s.tutorial ? 'tutorial' : s.body}`}
+                    onClick={() => pickScenario(id)}
+                    onDoubleClick={() => setStep('difficulty')}
+                  >
+                    <span className="st-scen-art" aria-hidden />
+                    <span className="st-scen-name">{s.name}</span>
+                    <span className="st-scen-tag">{s.tagline}</span>
+                    <span className="st-scen-meta">{s.tutorial ? 'Tutorial · 10 minutes' : `${fmt.m(s.budgetM)} · launch within ${s.deadlineMonths} months`}</span>
+                    <span className="st-scen-crit">
+                      {s.critical.map((r: ResourceId) => <span key={r}><ResourceIcon id={r} /> {RESOURCES[r].name}</span>)}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            <p className="st-credit">
+              Earth map: NASA Blue Marble Next Generation. Stars: NASA SVS Deep Star Maps 2020. Built with AI assistance.
+              Made for NASA Space Apps 2026; not endorsed by NASA or GGPEN.
+            </p>
+          </>
+        )}
+
+        {step === 'difficulty' && (
+          <>
+            <div className="st-kicker">{sc.name}</div>
+            <h1>How <em>hard</em>?</h1>
+            <p className="st-lead">{sc.tutorial ? 'The tutorial is played on Cadet, with a coach for every step.' : 'The same mission, with more or less money, time and luck.'}</p>
+            <div className="st-diff-row" role="radiogroup" aria-label="Difficulty">
+              {(Object.keys(DIFFICULTY) as Difficulty[]).map((k) => {
+                const budget = sc.budgetM * DIFFICULTY[k].budget;
+                return (
+                  <button key={k} type="button" role="radio" aria-checked={difficulty === k} autoFocus={difficulty === k} className={difficulty === k ? 'on' : ''} disabled={!!sc.tutorial && k !== 'cadet'} onClick={() => setDifficulty(k)} onDoubleClick={() => setStep('players')}>
+                    <b>{DIFFICULTY[k].name}</b>
+                    <span>{DIFFICULTY[k].explain}</span>
+                    <em>Budget {Number.isFinite(budget) ? fmt.m(budget) : 'unlimited'} · {DIFFICULTY[k].events ? 'surprises in flight' : 'no random failures'}</em>
+                  </button>
+                );
+              })}
+            </div>
+          </>
+        )}
+
+        {step === 'players' && (
+          <>
+            <div className="st-kicker">{sc.name} · {DIFFICULTY[difficulty].name}</div>
+            <h1>Who is <em>flying</em>?</h1>
+            <TeamPicker mode={mode} setMode={setMode} names={names} setNames={setNames} rooms={rooms} />
+          </>
+        )}
+
+        {step === 'join' && (
+          <>
+            <div className="st-kicker">Network room</div>
+            <h1>Join a <em>team</em>.</h1>
+            <p className="st-lead">Enter the room code your host shows. The host has already chosen the mission and the difficulty.</p>
+            <div className="st-names">
+              <label className="st-name-field">
+                <span>Your name</span>
+                <input value={names[0]} placeholder="Your name" autoFocus onChange={(e) => setNames([e.target.value, ...names.slice(1)])} />
+              </label>
+              <label className="st-name-field">
+                <span>Room code</span>
+                <input value={code} placeholder="ABCD" onChange={(e) => setCode(cleanCode(e.target.value))} className="st-code-input" />
+              </label>
+            </div>
+          </>
+        )}
       </div>
-      <div className="st-diff">
-        <h3>Difficulty</h3>
-        <div className="st-diff-row" role="radiogroup" aria-label="Difficulty">
-          {(Object.keys(DIFFICULTY) as Difficulty[]).map((k) => (
-            <button key={k} type="button" role="radio" aria-checked={difficulty === k} className={difficulty === k ? 'on' : ''} disabled={!!sc.tutorial && k !== 'cadet'} onClick={() => setDifficulty(k)}>
-              <b>{DIFFICULTY[k].name}</b>
-              <span>{DIFFICULTY[k].explain}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-      <TeamPicker mode={mode} setMode={setMode} names={names} setNames={setNames} code={code} setCode={setCode} rooms={rooms} />
-      <div className="st-select-go">
-        <button type="button" className="st-primary big" disabled={mode === 'join' && code.length < 3} onClick={go}>
-          {mode === 'join' ? `Join room ${code || '…'} →` : mode === 'host' ? `Open a room for ${sc.name} →` : `Start: ${sc.name} →`}
-        </button>
-      </div>
-      <p className="st-credit">
-        Earth map: NASA Blue Marble Next Generation. Stars: NASA SVS Deep Star Maps 2020. Built with AI assistance.
-        Made for NASA Space Apps 2026; not endorsed by NASA or GGPEN.
-      </p>
+
+      <footer className="st-setup-foot">
+        {back ? <button type="button" className="st-ghost big" onClick={() => setStep(back)}>← Back</button> : rooms ? (
+          <p className="st-sub">Joining a team? <button type="button" className="st-link" onClick={() => setStep('join')}>Enter a room code</button></p>
+        ) : <span />}
+        {step === 'mission' && <button type="button" className="st-primary big" onClick={() => setStep('difficulty')}>Next: difficulty →</button>}
+        {step === 'difficulty' && <button type="button" className="st-primary big" onClick={() => setStep('players')}>Next: players →</button>}
+        {step === 'players' && <button type="button" className="st-primary big" onClick={go}>{mode === 'host' ? 'Open the room →' : 'Start the mission →'}</button>}
+        {step === 'join' && <button type="button" className="st-primary big" disabled={code.length < 3} onClick={go}>Join room {code || '…'} →</button>}
+      </footer>
     </div>
   );
 }
@@ -208,7 +284,7 @@ export function Review() {
             <span>{go ? 'No blocking problems. Every warning is a risk you choose to accept.' : `${fails.length} blocking problem${fails.length > 1 ? 's' : ''}. You can still fly, and learn from what goes wrong.`}</span>
           </div>
           <button type="button" className="st-ghost" onClick={() => setPhase('design')}>Back to the desks</button>
-          <button type="button" className={go ? 'st-primary' : 'st-danger'} onClick={() => setPhase('fly')}>{go ? 'Launch the mission' : 'Fly anyway'}</button>
+          <button type="button" className={go ? 'st-primary' : undefined} onClick={() => setPhase('fly')}>{go ? 'Launch the mission' : 'Fly anyway'}</button>
         </div>
       ) : (
         <GoPoll a={a} />

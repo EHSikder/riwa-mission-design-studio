@@ -6,32 +6,30 @@
 import { useEffect, useState } from 'react';
 import type { Analysis } from '../model/analyze';
 import {
-  ALLOC_DESKS, MAX_PLAYERS, ROLE_GOALS, ROLE_IDS, canEdit, overruns, ownerOf, pools, proposeSplit, rolesOf, unanimousGo, usage,
+  ALLOC_DESKS, MAX_PLAYERS, PLAYER_COLORS, ROLE_GOALS, ROLE_IDS, canEdit, overruns, ownerOf, pools, proposeSplit, rolesOf, unanimousGo, usage,
   type AllocDesk, type Allocation, type Teamwork,
 } from '../model/team';
 import { ROLES, type RoleId } from '../model/types';
-import { cleanCode, lanAddresses } from '../net/room';
+import { lanAddresses } from '../net/room';
 import { useStudio } from '../state';
 import { Lines, StatusBadge, fmt } from './controls';
 
 // -------------------------------------------------------------------- who plays
 
-export type PlayMode = 'solo' | 'hotseat' | 'host' | 'join';
+export type PlayMode = 'solo' | 'hotseat' | 'host';
 
-export function TeamPicker(props: { mode: PlayMode; setMode: (m: PlayMode) => void; names: string[]; setNames: (n: string[]) => void; code: string; setCode: (c: string) => void; rooms: boolean | null }) {
+export function TeamPicker(props: { mode: PlayMode; setMode: (m: PlayMode) => void; names: string[]; setNames: (n: string[]) => void; rooms: boolean | null }) {
   const { mode, names, rooms } = props;
-  const modes: { id: PlayMode; title: string; text: string; network?: boolean }[] = [
-    { id: 'solo', title: 'Solo', text: 'You hold all five roles.' },
+  const modes: { id: PlayMode; title: string; text: string }[] = [
+    { id: 'solo', title: 'Solo', text: 'You hold all five roles and switch desks with the tabs.' },
     { id: 'hotseat', title: 'Team on this screen', text: '2–4 players share one computer and pass the keyboard.' },
-    { id: 'host', title: 'Host a network room', text: 'Teammates join from their own computers.', network: true },
-    { id: 'join', title: 'Join a network room', text: 'Enter the room code your host shows.', network: true },
+    { id: 'host', title: 'Host a network room', text: 'Teammates join from their own computers, each at their own desk.' },
   ];
   return (
     <div className="st-who">
-      <h3>Who is playing?</h3>
-      <div className="st-diff-row" role="radiogroup" aria-label="Players">
+      <div className="st-diff-row three" role="radiogroup" aria-label="Players">
         {modes.map((m) => (
-          <button key={m.id} type="button" role="radio" aria-checked={mode === m.id} className={mode === m.id ? 'on' : ''} disabled={m.network && rooms === false} onClick={() => props.setMode(m.id)}>
+          <button key={m.id} type="button" role="radio" aria-checked={mode === m.id} autoFocus={mode === m.id} className={mode === m.id ? 'on' : ''} disabled={m.id === 'host' && rooms === false} onClick={() => props.setMode(m.id)}>
             <b>{m.title}</b>
             <span>{m.text}</span>
           </button>
@@ -42,7 +40,7 @@ export function TeamPicker(props: { mode: PlayMode; setMode: (m: PlayMode) => vo
         <div className="st-names">
           {names.map((n, i) => (
             <label key={i} className="st-name-field">
-              <span className="st-dot" style={{ background: ['#5ad1ff', '#ffb547', '#ff7ad9', '#4fd18b'][i] }} />
+              <span className="st-dot" style={{ background: PLAYER_COLORS[i] }} />
               <input value={n} placeholder={`Player ${i + 1}`} aria-label={`Player ${i + 1} name`} onChange={(e) => props.setNames(names.map((x, k) => (k === i ? e.target.value : x)))} />
               {names.length > 2 && <button type="button" className="st-ghost" onClick={() => props.setNames(names.filter((_, k) => k !== i))} aria-label={`Remove player ${i + 1}`}>✕</button>}
             </label>
@@ -50,18 +48,12 @@ export function TeamPicker(props: { mode: PlayMode; setMode: (m: PlayMode) => vo
           {names.length < MAX_PLAYERS && <button type="button" className="st-link" onClick={() => props.setNames([...names, ''])}>+ Add a player</button>}
         </div>
       )}
-      {(mode === 'host' || mode === 'join') && (
+      {mode === 'host' && (
         <div className="st-names">
           <label className="st-name-field">
             <span>Your name</span>
             <input value={names[0]} placeholder="Your name" onChange={(e) => props.setNames([e.target.value, ...names.slice(1)])} />
           </label>
-          {mode === 'join' && (
-            <label className="st-name-field">
-              <span>Room code</span>
-              <input value={props.code} placeholder="ABCD" onChange={(e) => props.setCode(cleanCode(e.target.value))} className="st-code-input" />
-            </label>
-          )}
         </div>
       )}
     </div>
@@ -71,7 +63,7 @@ export function TeamPicker(props: { mode: PlayMode; setMode: (m: PlayMode) => vo
 // -------------------------------------------------------------------- the LAN lobby
 
 export function Lobby() {
-  const { team, room, roomStatus, me, scenario, teamOp, setPhase } = useStudio();
+  const { team, room, roomStatus, me, scenario, teamOp, setPhase, exit } = useStudio();
   const [addresses, setAddresses] = useState<string[]>([]);
   useEffect(() => { lanAddresses().then(setAddresses); }, []);
   const port = location.port ? `:${location.port}` : '';
@@ -115,7 +107,8 @@ export function Lobby() {
           </ul>
         </section>
       </div>
-      <div className="st-select-go">
+      <div className="st-lobby-go">
+        <button type="button" className="st-ghost big" onClick={exit}>← Leave the room</button>
         <button type="button" className="st-primary big" disabled={!scenario || !everyone || me !== host?.id} onClick={() => setPhase('brief')}>
           {me === host?.id ? 'Start the mission →' : `Waiting for ${host?.name ?? 'the host'} to start`}
         </button>
@@ -319,8 +312,8 @@ export function GoPoll({ a }: { a: Analysis }) {
               {canEdit(team, r) && (
                 <span className="st-poll-buttons">
                   <input value={reasons[r] ?? ''} placeholder="Reason" onChange={(e) => setReasons({ ...reasons, [r]: e.target.value })} aria-label={`${ROLES[r].short} reason`} />
-                  <button type="button" className="st-go" onClick={() => teamOp({ t: 'call', role: r, go: true, reason: reasons[r] ?? '' })}>GO</button>
-                  <button type="button" className="st-nogo" onClick={() => teamOp({ t: 'call', role: r, go: false, reason: reasons[r] ?? '' })}>NO-GO</button>
+                  <button type="button" className="st-primary" onClick={() => teamOp({ t: 'call', role: r, go: true, reason: reasons[r] ?? '' })}>GO</button>
+                  <button type="button" onClick={() => teamOp({ t: 'call', role: r, go: false, reason: reasons[r] ?? '' })}>NO-GO</button>
                 </span>
               )}
             </li>
@@ -330,7 +323,7 @@ export function GoPoll({ a }: { a: Analysis }) {
       <div className="st-poll-launch">
         <button type="button" className="st-primary big" disabled={!allGo || !director} onClick={() => fly()}>{allGo ? 'Launch the mission' : 'Waiting for every GO'}</button>
         {director && !allGo && (
-          <button type="button" className="st-danger" onClick={() => { teamOp({ t: 'override' }); fly(); }} title="Launch without a unanimous GO: it costs teamwork points">
+          <button type="button" onClick={() => { teamOp({ t: 'override' }); fly(); }} title="Launch without a unanimous GO: it costs teamwork points">
             Director: launch anyway
           </button>
         )}

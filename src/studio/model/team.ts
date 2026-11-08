@@ -16,7 +16,8 @@ export type AllocDesk = 'spacecraft' | 'science' | 'comms';
 
 export const ROLE_IDS = Object.keys(ROLES) as RoleId[];
 export const ALLOC_DESKS: AllocDesk[] = ['spacecraft', 'science', 'comms'];
-export const PLAYER_COLORS = ['#5ad1ff', '#ffb547', '#ff7ad9', '#4fd18b'];
+/** Sky, white, accent and the pale navy blue of the design system: one per player. */
+export const PLAYER_COLORS = ['#60bee8', '#ffffff', '#3792c2', '#a7b2cb'];
 export const MAX_PLAYERS = 4;
 
 export interface Player {

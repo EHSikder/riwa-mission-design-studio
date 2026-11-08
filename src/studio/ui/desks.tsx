@@ -79,7 +79,7 @@ export function RequirementsTable({ a, edit, readOnly, hidePrediction }: DeskPro
       {a.requirements.map((r) => (
         <div key={r.req.id} className={`st-req ${r.met}`}>
           <div className="st-req-head">
-            <span className="st-req-label">{r.objective ? `${r.objective.name}: ` : ''}{r.req.label}</span>
+            <span>{r.objective ? `${r.objective.name}: ` : ''}{r.req.label}</span>
             <Info text={hidePrediction ? r.req.explain : <>{r.req.explain}<br /><br /><b>Prediction:</b> {r.why}</>} />
           </div>
           <div className="st-req-row">

@@ -10,7 +10,7 @@ import { SCENARIOS } from '../src/studio/model/scenarios';
 import { evaluate } from '../src/studio/model/score';
 import { MissionRun } from '../src/studio/model/simulate';
 import {
-  ROLE_IDS, canEdit, defaultRoles, makePlayer, newTeam, overruns, pools, proposeSplit, tally, teamReduce, teamwork, usage, type TeamState,
+  PLAYER_COLORS, ROLE_IDS, canEdit, defaultRoles, makePlayer, newTeam, overruns, pools, proposeSplit, tally, teamReduce, teamwork, usage, type TeamState,
 } from '../src/studio/model/team';
 
 const players = (n: number) => Array.from({ length: n }, (_, i) => makePlayer(`P${i + 1}`, i, `p${i + 1}`));
@@ -30,7 +30,7 @@ describe('the team', () => {
     let t: TeamState = newTeam('lan', []);
     t = teamReduce(t, { t: 'join', player: { id: 'a', name: 'Ana', color: '' } });
     t = teamReduce(t, { t: 'join', player: { id: 'b', name: 'Ben', color: '' } });
-    expect(t.players.map((p) => p.color)).toEqual(['#5ad1ff', '#ffb547']);
+    expect(t.players.map((p) => p.color)).toEqual(PLAYER_COLORS.slice(0, 2));
     expect(t.roles.science).toBe('a');
     t = teamReduce(t, { t: 'claim', role: 'science', player: 'b' });
     expect(t.roles.science).toBe('b');

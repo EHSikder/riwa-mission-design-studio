@@ -60,9 +60,11 @@ function TopBar() {
             className={`${s.phase === phase ? 'on' : ''} ${k < idx ? 'done' : ''}`}
             disabled={!reachable(s.phase, k)}
             onClick={() => setPhase(s.phase)}
+            title={s.label}
+            aria-label={s.label}
           >
             <span>{k + 1}</span>
-            {s.label}
+            <i className="st-step-name">{s.label}</i>
           </button>
         ))}
       </nav>

@@ -11,6 +11,9 @@ import { INSTRUMENTS } from '../model/instruments';
 import { REGIONS, type RegionId } from '../model/regions';
 import { Seg } from './controls';
 
+/** Swath colours by instrument slot: the design system's blues. */
+const SWATH = ['#60bee8', '#3792c2', '#ffffff', '#a7b2cb'];
+
 const VIEWS = {
   africa: { lonMin: -30, lonMax: 70, latMin: -45, latMax: 40 },
   world: { lonMin: -180, lonMax: 180, latMin: -80, latMax: 80 },
@@ -67,7 +70,7 @@ export function GroundTrack({ a }: { a: Analysis }) {
       ctx.fillStyle = 'rgba(2, 6, 16, 0.35)';
       ctx.fillRect(0, 0, W, H);
     } else {
-      ctx.fillStyle = '#0a1a33';
+      ctx.fillStyle = '#0a0f26';
       ctx.fillRect(0, 0, W, H);
     }
     const path = (pts: [number, number][]) => {
@@ -85,9 +88,9 @@ export function GroundTrack({ a }: { a: Analysis }) {
     for (const id of regions) {
       for (const ring of REGIONS[id].rings) {
         path([...ring, ring[0]]);
-        ctx.fillStyle = 'rgba(255, 181, 71, 0.22)';
+        ctx.fillStyle = 'rgba(96, 190, 232, 0.22)';
         ctx.fill();
-        ctx.strokeStyle = '#ffb547';
+        ctx.strokeStyle = '#60bee8';
         ctx.lineWidth = 1.5;
         ctx.stroke();
       }
@@ -97,20 +100,20 @@ export function GroundTrack({ a }: { a: Analysis }) {
       const el = (20 * Math.PI) / 180;
       const c = Math.acos(k * Math.cos(el)) - el;
       path(circle(0, a.design.orbit.lonDeg, c));
-      ctx.fillStyle = 'rgba(90, 209, 255, 0.16)';
+      ctx.fillStyle = 'rgba(96, 190, 232, 0.16)';
       ctx.fill();
-      ctx.strokeStyle = '#5ad1ff';
+      ctx.strokeStyle = '#60bee8';
       ctx.lineWidth = 1.5;
       ctx.stroke();
-      ctx.fillStyle = '#5ad1ff';
+      ctx.fillStyle = '#60bee8';
       ctx.beginPath();
       ctx.arc(X(a.design.orbit.lonDeg), Y(0), 6, 0, 2 * Math.PI);
       ctx.fill();
-      ctx.font = '600 12px Inter, system-ui, sans-serif';
+      ctx.font = '600 12px Archivo, Arial, sans-serif';
       ctx.fillText(`Slot ${a.design.orbit.lonDeg.toFixed(0)}°`, X(a.design.orbit.lonDeg) + 9, Y(0) - 8);
     } else {
       // swaths (widest first), then the track itself
-      const swaths = a.design.instruments.map((id) => INSTRUMENTS[id]).filter((i) => i.swathKm).map((i) => ({ i, km: i.kind === 'sar' || !i.refAltKm ? i.swathKm! : (i.swathKm! * o.imagingAltKm) / i.refAltKm }))
+      const swaths = a.design.instruments.map((id, slot) => ({ ...INSTRUMENTS[id], color: SWATH[slot % SWATH.length] })).filter((i) => i.swathKm).map((i) => ({ i, km: i.kind === 'sar' || !i.refAltKm ? i.swathKm! : (i.swathKm! * o.imagingAltKm) / i.refAltKm }))
         .sort((p, q) => q.km - p.km);
       const pts = track.map((p) => [p.lon, p.lat] as [number, number]);
       for (const { i, km } of swaths) {
@@ -128,19 +131,19 @@ export function GroundTrack({ a }: { a: Analysis }) {
       ctx.stroke();
     }
     // ground stations and their hearing circles
-    ctx.font = '600 11px Inter, system-ui, sans-serif';
+    ctx.font = '600 11px Archivo, Arial, sans-serif';
     for (const id of a.design.stations) {
       const st = STATIONS[id];
       if (st.deepSpace) continue;
       if (!geo) {
         path(circle(st.lat, st.lon, horizonAngle(o.body, o.altKm, st.minElDeg)));
-        ctx.strokeStyle = 'rgba(79, 209, 139, 0.9)';
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
         ctx.setLineDash([4, 3]);
         ctx.lineWidth = 1.2;
         ctx.stroke();
         ctx.setLineDash([]);
       }
-      ctx.fillStyle = '#4fd18b';
+      ctx.fillStyle = '#ffffff';
       ctx.beginPath();
       ctx.arc(X(st.lon), Y(st.lat), 4, 0, 2 * Math.PI);
       ctx.fill();
