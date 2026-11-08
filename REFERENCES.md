@@ -15,7 +15,7 @@ Every number in the catalogs carries its own source note in the code (`src/studi
 | [MAVEN](https://science.nasa.gov/mission/maven/): imaging ultraviolet spectrograph, magnetometer (with Mars Global Surveyor) | The Mars atmosphere and magnetic-field instruments, as class references |
 | [Small Spacecraft Technology State of the Art](https://www.nasa.gov/smallsat-institute/sst-soa) | Solar cells, batteries, cold-gas thrusters, onboard computers, attitude control |
 | [DSN Telecommunications Link Design Handbook (810-005)](https://deepspace.jpl.nasa.gov/dsndocs/810-005/) | The receiving performance of the Deep Space Network's 34 m antennas |
-| LOLA reference radius of the Moon | A physical constant (`src/sim/core/constants.ts`) |
+| LOLA reference radius of the Moon | A physical constant (`src/studio/model/types.ts`) |
 
 **Add here:** the NASA data you use from the challenge's Resources tab (due 13 November 2026).
 

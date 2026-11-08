@@ -4,12 +4,9 @@
  * the cylindrical shadow), how fast drag pulls a low orbit down (exponential atmosphere, ballistic
  * coefficient), the radiation dose, the distance to Earth for the radio link, and the Δv to get there and stay.
  */
-import { G0 } from '../../sim/core/constants';
 import { ORBIT_TYPES, type LaunchTarget, type OrbitTypeId } from './catalog';
 import type { OrbitChoice } from './design';
-import { BODIES, YEAR, type Body } from './types';
-
-const DEG = Math.PI / 180;
+import { BODIES, DEG, G0, YEAR, type Body } from './types';
 
 export interface OrbitFacts {
   body: Body;
@@ -149,12 +146,12 @@ export function marsCaptureDv(periKm: number, apoKm: number | null): number {
 }
 
 /** Lunar orbits from a translunar coast: insertion Δv, transfer time, station keeping per year, disposal (estimates). */
+// LLO ≈ Apollo LOI (889 m/s); ELFO from a 12 h frozen orbit at 500 km; L2 halo via a lunar flyby (Queqiao, 25 days) or a ballistic low-energy transfer (CAPSTONE, ~4 months); estimates
 export const LUNAR_DV: Record<'llo' | 'elfo' | 'halo', { insertion: number; lowEnergy?: number; days: number; lowEnergyDays?: number; keepPerYear: number; disposal: number }> = {
   llo: { insertion: 850, days: 4.5, keepPerYear: 80, disposal: 0 },
   elfo: { insertion: 450, days: 5, keepPerYear: 5, disposal: 10 },
   halo: { insertion: 200, lowEnergy: 60, days: 25, lowEnergyDays: 100, keepPerYear: 20, disposal: 10 },
 };
-export const LUNAR_DV_SOURCE = 'LLO ≈ Apollo LOI (889 m/s); ELFO from a 12 h frozen orbit at 500 km; L2 halo via a lunar flyby (Queqiao, 25 days) or a ballistic low-energy transfer (CAPSTONE, ~4 months); estimates';
 
 export function orbitFacts(o: OrbitChoice): OrbitFacts {
   const t = ORBIT_TYPES[o.type];

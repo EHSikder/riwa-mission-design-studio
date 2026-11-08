@@ -6,7 +6,7 @@
  * with honest trade-offs; every choice is remembered and judged in the report. Same seed + same choices =
  * the same mission, so a team can replay and compare.
  */
-import { createRng, type Rng } from '../../sim/core/rng';
+import { createRng, type Rng } from './rng';
 import type { Analysis } from './analyze';
 import { ADCS, CELLS, COMPUTERS, LAUNCHERS, PROPULSION, STATIONS, batteryCycleLife } from './catalog';
 import { DIFFICULTY } from './design';
@@ -14,7 +14,7 @@ import { INSTRUMENTS, type InstrumentId } from './instruments';
 import { earthMarsGeometry } from './access';
 import { MARS_YEAR_DAYS } from './types';
 
-export type SimPhase = 'development' | 'launch' | 'cruise' | 'operations' | 'ended';
+export type SimPhase = 'development' | 'cruise' | 'operations' | 'ended';
 
 export interface EventOption {
   id: string;
@@ -115,7 +115,7 @@ const EVENTS: Spec[] = [
       const wouldMiss = mars && (a.scenario.windows!.find((w) => w >= a.time.devMonths + 3) ?? Infinity) > a.time.launchMonth;
       return [
         { id: 'wait', label: 'Wait for it (launch 3 months later)', explain: wouldMiss ? 'Three months late misses the launch window: the next one is 26 months later.' : 'The team waits; every month of delay costs salaries.', quality: wouldMiss ? 0.1 : 0.55 },
-        { id: 'rush', label: `Pay overtime (${'$'}${rush.toFixed(1)}M from the reserve)`, explain: 'Money buys back the time, if the reserve can cover it.', quality: a.cost.reserveM >= rush ? 0.85 : 0.35 },
+        { id: 'rush', label: `Pay overtime ($${rush.toFixed(1)}M from the reserve)`, explain: 'Money buys back the time, if the reserve can cover it.', quality: a.cost.reserveM >= rush ? 0.85 : 0.35 },
       ];
     },
     resolve: (r, o) => {
@@ -123,7 +123,7 @@ const EVENTS: Spec[] = [
       if (o === 'rush') {
         const cost = 0.06 * a.cost.developmentM;
         r.spend(cost);
-        return `Overtime paid: ${'$'}${cost.toFixed(1)}M. The schedule holds.`;
+        return `Overtime paid: $${cost.toFixed(1)}M. The schedule holds.`;
       }
       const before = r.st.launchMonth;
       let next = before + 3;
@@ -131,7 +131,7 @@ const EVENTS: Spec[] = [
       r.st.launchMonth = Math.max(before, next);
       const months = r.st.launchMonth - before;
       r.spend(0.02 * a.cost.developmentM * months);
-      return months > 0 ? `Launch moves from month ${before} to month ${r.st.launchMonth}; the team's salaries cost ${'$'}${(0.02 * a.cost.developmentM * months).toFixed(1)}M more.` : 'The delay was absorbed by the wait for the launch.';
+      return months > 0 ? `Launch moves from month ${before} to month ${r.st.launchMonth}; the team's salaries cost $${(0.02 * a.cost.developmentM * months).toFixed(1)}M more.` : 'The delay was absorbed by the wait for the launch.';
     },
     lesson: 'Schedule margin and a money reserve are two ways to absorb the same surprise.',
   },
@@ -141,7 +141,7 @@ const EVENTS: Spec[] = [
     rate: () => 0.45,
     text: () => 'During the vibration test that imitates the launch, a bracket cracked. Engineers can redesign it, or argue it will hold.',
     options: (a) => [
-      { id: 'fix', label: `Fix and re-test (+6 weeks, ${'$'}${(0.03 * a.cost.developmentM).toFixed(1)}M)`, explain: 'The safe choice: tests exist to find exactly this.', quality: 0.9 },
+      { id: 'fix', label: `Fix and re-test (+6 weeks, $${(0.03 * a.cost.developmentM).toFixed(1)}M)`, explain: 'The safe choice: tests exist to find exactly this.', quality: 0.9 },
       { id: 'fly', label: 'Fly as it is', explain: 'No delay, no cost, but a hidden weakness rides along.', quality: 0.15 },
     ],
     resolve: (r, o) => {
@@ -163,7 +163,7 @@ const EVENTS: Spec[] = [
     resolve: (r) => {
       const c = 0.05 * r.a.cost.developmentM;
       r.spend(c);
-      return `${'$'}${c.toFixed(1)}M more, taken from the reserve.`;
+      return `$${c.toFixed(1)}M more, taken from the reserve.`;
     },
     lesson: 'Almost every space project grows in cost: that is what the reserve is for.',
   },
@@ -253,7 +253,7 @@ const EVENTS: Spec[] = [
     rate: () => 0.35,
     text: (a) => `${STATIONS[a.design.stations[0]].short} is down for 10 days of repairs.`,
     options: () => [
-      { id: 'rent', label: `Rent a commercial station (${'$'}0.15M)`, explain: 'Data keeps flowing.', quality: 0.7 },
+      { id: 'rent', label: `Rent a commercial station ($0.15M)`, explain: 'Data keeps flowing.', quality: 0.7 },
       { id: 'wait', label: 'Wait it out', explain: 'Data piles up on board; if the storage fills, it is lost.', quality: 0.45 },
     ],
     resolve: (r, o) => {
@@ -314,7 +314,7 @@ const EVENTS: Spec[] = [
       const years = Math.max(0, r.a.design.plannedYears - r.st.day / 365.25);
       r.st.revenueM += 4 * years;
       r.st.leased = true;
-      return `Leased: ${'$'}${(4 * years).toFixed(0)}M of revenue over the remaining ${years.toFixed(1)} years.`;
+      return `Leased: $${(4 * years).toFixed(0)}M of revenue over the remaining ${years.toFixed(1)} years.`;
     },
     lesson: 'Commercial satellites pay for themselves by selling capacity; there is no single right answer between service and revenue.',
   },
@@ -347,7 +347,7 @@ const EVENTS: Spec[] = [
       const st = a.design.stations.find((id) => STATIONS[id].deepSpace);
       const cost = st ? (STATIONS[st].costPerHourM ?? 0) * 8 : 0;
       return [
-        { id: 'buy', label: `Buy 8 extra antenna hours (${'$'}${(cost * 1000).toFixed(0)}k)`, explain: 'More science from the lander.', quality: 0.75 },
+        { id: 'buy', label: `Buy 8 extra antenna hours ($${(cost * 1000).toFixed(0)}k)`, explain: 'More science from the lander.', quality: 0.75 },
         { id: 'no', label: 'Decline', explain: 'Stay within the plan and the budget.', quality: 0.45 },
       ];
     },
@@ -518,7 +518,7 @@ export class MissionRun {
     if (this.rng.next() < pFail) {
       const payout = a.design.insurance ? 0.85 * (a.cost.developmentM + a.launch.priceM) : 0;
       this.st.revenueM += payout;
-      this.log({ id: 'launch', when: this.when(), t: this.st.month, title: 'Launch failure', text: `The ${a.design.launcher === 'rideshare' ? 'rideshare rocket' : 'rocket'} failed on the way to orbit.${payout ? ` Insurance pays back ${'$'}${payout.toFixed(0)}M.` : ' There was no insurance.'}`, kind: 'failure', lesson: 'Every rocket has a track record; insurance turns a lost satellite into a second chance.' });
+      this.log({ id: 'launch', when: this.when(), t: this.st.month, title: 'Launch failure', text: `The ${a.design.launcher === 'rideshare' ? 'rideshare rocket' : 'rocket'} failed on the way to orbit.${payout ? ` Insurance pays back $${payout.toFixed(0)}M.` : ' There was no insurance.'}`, kind: 'failure', lesson: 'Every rocket has a track record; insurance turns a lost satellite into a second chance.' });
       this.end('Launch failure');
       return;
     }

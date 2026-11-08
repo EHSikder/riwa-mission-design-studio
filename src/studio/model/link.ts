@@ -1,13 +1,18 @@
 /**
  * Radio links. The link budget: radiated power and antenna gain on one end, the receiver's figure of merit
  * G/T on the other, the free-space loss of the distance between them, and the energy per bit a good code
- * needs (plus 3 dB of margin, as in the crewed game). The result is the data rate the link can carry.
+ * needs (plus 3 dB of margin). The result is the data rate the link can carry.
  * Tropical rain fades the high bands: availability is the share of the time the margin beats the fade.
  */
-import { C_LIGHT } from '../../sim/core/constants';
-import { BOLTZMANN_DB, REQUIRED_EBN0_DB, dB, pathLossDb } from '../../sim/design/budgets';
 import { DISH_EFFICIENCY } from './catalog';
 import type { CommsBand } from './instruments';
+import { C_LIGHT } from './types';
+
+const dB = (x: number) => 10 * Math.log10(x);
+const BOLTZMANN_DB = 228.6;
+/** Eb/N0 for a turbo/LDPC code at BER 1e-6 (2.5 dB) plus 3 dB link margin. */
+const REQUIRED_EBN0_DB = 5.5;
+const pathLossDb = (distanceM: number, freqHz: number) => 20 * Math.log10((4 * Math.PI * distanceM * freqHz) / C_LIGHT);
 
 export const dishGainDbi = (diameterM: number, freqHz: number) => dB(DISH_EFFICIENCY * ((Math.PI * diameterM * freqHz) / C_LIGHT) ** 2);
 /** Half-power beamwidth of a dish (deg). */

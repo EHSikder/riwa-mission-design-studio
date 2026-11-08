@@ -16,18 +16,7 @@ import { networkInterfaces } from 'node:os';
 /** @typedef {import('node:http').IncomingMessage} Req */
 /** @typedef {import('node:http').ServerResponse} Res */
 /** @typedef {{ name: string, total: number, rank: string, outcome: string, team: string[] }} Flight */
-/**
- * @typedef {object} Room
- * @property {string} code
- * @property {string[]} ops
- * @property {number} bytes
- * @property {Set<Res>} clients
- * @property {number} touched
- * @property {string} scenario
- * @property {string} difficulty
- * @property {string[]} players
- * @property {Flight[]} flights
- */
+/** @typedef {{ code: string, ops: string[], bytes: number, clients: Set<Res>, touched: number, scenario: string, difficulty: string, players: string[], flights: Flight[] }} Room */
 
 /** @type {Map<string, Room>} */
 const rooms = new Map();

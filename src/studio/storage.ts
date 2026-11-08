@@ -56,14 +56,6 @@ export function saveDesign(design: StudioDesign): SavedDesign {
   return entry;
 }
 
-export const listDesigns = (scenario?: ScenarioId) => read().designs.filter((d) => !scenario || d.scenario === scenario);
-
-export function deleteDesign(id: string) {
-  const s = read();
-  s.designs = s.designs.filter((d) => d.id !== id);
-  write(s);
-}
-
 export function addScore(r: Report, scenario: ScenarioId, difficulty: Difficulty, team = 'Solo') {
   const s = read();
   s.scores = [...s.scores, { scenario, difficulty, name: r.name, team, total: r.score.total, rank: r.score.rank, outcome: r.outcome, at: Date.now() }].slice(-500);

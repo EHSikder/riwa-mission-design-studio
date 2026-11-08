@@ -7,11 +7,8 @@
  * - The Moon: when a far-side site sees the relay while the relay sees Earth, and when Earth is hidden.
  * - Mars: the Earth–Mars distance through the mission, and the solar-conjunction blackout.
  */
-import { AU } from '../../sim/core/constants';
 import { LUNAR_SITES, REGIONS, inRegion, regionBox, regionGrid, type RegionId } from './regions';
-import { BODIES, type Body } from './types';
-
-const DEG = Math.PI / 180;
+import { AU, BODIES, DEG, type Body } from './types';
 
 export interface AccessSensor {
   id: string;

@@ -75,7 +75,6 @@
 .st-steps button.done span { border-color: var(--st-good); color: var(--st-good); }
 .st-actions { display: flex; gap: 6px; margin-left: 10px; }
 .st-body { flex: 1; min-height: 0; position: relative; }
-.st-soon { display: grid; place-items: center; height: 100%; color: var(--st-muted); font-size: 16px; }
 
 /* ------------------------------------------------------------ workspace */
 .st-work { height: 100%; display: grid; grid-template-columns: minmax(380px, 440px) minmax(0, 1fr) minmax(330px, 380px); }

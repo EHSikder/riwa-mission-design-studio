@@ -1,10 +1,19 @@
 /**
- * The Mission Design Studio's shared vocabulary (docs/03). The models work in SI units (m, s, kg, W); catalog
- * fields carry their unit in the name (altKm, costM in US$ millions, dataMbps, powerW, devMonths).
+ * The Mission Design Studio's shared vocabulary (docs/03) and physical constants (sources: REFERENCES.md). The
+ * models work in SI units (m, s, kg, W); catalog fields carry their unit in the name (altKm, costM in US$
+ * millions, dataMbps, powerW, devMonths).
  */
-import { AU, J2_EARTH, MU_EARTH, MU_MOON, OMEGA_EARTH, R_EARTH, R_MOON } from '../../sim/core/constants';
+export const DEG = Math.PI / 180;
+/** Standard gravity, to turn Isp (s) into exhaust velocity. */
+export const G0 = 9.806_65;
+export const C_LIGHT = 299_792_458;
+export const AU = 1.495_978_707e11;
 
-export type { Sourced } from '../../sim/design/catalog';
+/** A catalog value and where it came from; `estimate` marks our own estimates (shown with ⚠). */
+export interface Sourced {
+  source: string;
+  estimate: boolean;
+}
 
 export type Difficulty = 'cadet' | 'engineer' | 'expert' | 'sandbox';
 export type RoleId = 'director' | 'spacecraft' | 'science' | 'comms' | 'resources';
@@ -83,18 +92,20 @@ export interface Body {
 const YEAR_S = 365.2422 * 86_400;
 
 export const BODIES: Record<BodyId, Body> = {
+  // standard GM, WGS-84 equatorial radius, J2 and rotation rate
   earth: {
-    id: 'earth', name: 'Earth', mu: MU_EARTH, radius: R_EARTH, j2: J2_EARTH, rotation: OMEGA_EARTH,
-    sunDistance: AU, sunRate: (2 * Math.PI) / YEAR_S, obliquity: 23.44 * (Math.PI / 180), magneticField: true, atmosphere: true,
+    id: 'earth', name: 'Earth', mu: 3.986_004_418e14, radius: 6_378_137, j2: 1.082_63e-3, rotation: 7.292_115e-5,
+    sunDistance: AU, sunRate: (2 * Math.PI) / YEAR_S, obliquity: 23.44 * DEG, magneticField: true, atmosphere: true,
   },
+  // GM and the LOLA reference radius
   moon: {
-    id: 'moon', name: 'Moon', mu: MU_MOON, radius: R_MOON, j2: 2.033e-4, rotation: (2 * Math.PI) / (27.3217 * 86_400),
-    sunDistance: AU, sunRate: (2 * Math.PI) / YEAR_S, obliquity: 1.54 * (Math.PI / 180), magneticField: false, atmosphere: false,
+    id: 'moon', name: 'Moon', mu: 4.902_8e12, radius: 1_737_400, j2: 2.033e-4, rotation: (2 * Math.PI) / (27.3217 * 86_400),
+    sunDistance: AU, sunRate: (2 * Math.PI) / YEAR_S, obliquity: 1.54 * DEG, magneticField: false, atmosphere: false,
   },
   // NASA Mars Fact Sheet: GM 42 828 km³/s², mean radius 3 389.5 km, J2 1960.45e-6, day 24.6229 h, year 686.98 d
   mars: {
     id: 'mars', name: 'Mars', mu: 4.282_837e13, radius: 3_389_500, j2: 1.960_45e-3, rotation: (2 * Math.PI) / (24.6229 * 3600),
-    sunDistance: 1.523_7 * AU, sunRate: (2 * Math.PI) / (686.98 * 86_400), obliquity: 25.19 * (Math.PI / 180), magneticField: false, atmosphere: true,
+    sunDistance: 1.523_7 * AU, sunRate: (2 * Math.PI) / (686.98 * 86_400), obliquity: 25.19 * DEG, magneticField: false, atmosphere: true,
   },
 };
 

@@ -62,7 +62,6 @@ src/studio/model/   the model: catalogs, missions, regions, orbit, coverage and 
 src/studio/ui/      the screens: mission select, desks, dashboard, flight, report, team, help
 src/studio/three/   the 3D spacecraft, built from the design
 src/studio/net/     the room client
-src/sim/            physical constants, seeded random numbers, link-budget basics
 server/             the game's own server: the built files and the rooms for network play (no dependencies)
 tests/              model, physics, coverage, simulation, team and server tests
 ```

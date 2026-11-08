@@ -85,8 +85,7 @@ export function Timeline({ events }: { events: SimEvent[] }) {
 function Clock({ run }: { run: MissionRun }) {
   const st = run.st;
   const total = Math.round(run.a.design.plannedYears * 365.25);
-  const phases = ['development', 'cruise', 'operations', 'ended'] as const;
-  const at = phases.indexOf(st.phase === 'launch' ? 'cruise' : st.phase);
+  const at = ['development', 'cruise', 'operations', 'ended'].indexOf(st.phase);
   const text =
     st.phase === 'development' ? `Building · month ${Math.floor(st.month)} · launch planned ${monthLabel(st.launchMonth)}`
       : st.phase === 'cruise' ? `On the way · ${Math.max(0, -Math.round(st.day))} days to the operating orbit`

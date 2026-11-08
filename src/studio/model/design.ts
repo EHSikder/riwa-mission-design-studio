@@ -4,7 +4,7 @@
  */
 import type { AntennaId, AdcsId, ArrayMountId, BandId, CellId, ComputerId, LauncherId, OrbitTypeId, PlatformId, PropulsionId, StationId } from './catalog';
 import type { InstrumentId } from './instruments';
-import type { Difficulty, RoleId, ScenarioId } from './types';
+import type { Difficulty, ScenarioId } from './types';
 
 export type Level = 'threshold' | 'goal';
 
@@ -68,16 +68,6 @@ export interface StudioDesign {
   /** Launch-plus-first-year insurance (GEO). */
   insurance: boolean;
 }
-
-/** Which desk owns each design field: the hot-seat and LAN games lock the others' fields. */
-export const FIELD_OWNER: Record<keyof Omit<StudioDesign, 'version' | 'scenario' | 'name'>, RoleId> = {
-  primary: 'director', secondary: 'director', levels: 'director', orbit: 'director', launcher: 'director', plannedYears: 'director',
-  platform: 'spacecraft', cells: 'spacecraft', mount: 'spacecraft', arrayM2: 'spacecraft', batteryWh: 'spacecraft', computer: 'spacecraft',
-  redundant: 'spacecraft', adcs: 'spacecraft', propulsion: 'spacecraft', propellantMarginPct: 'spacecraft',
-  instruments: 'science',
-  band: 'comms', antenna: 'comms', dishM: 'comms', txW: 'comms', storageGbit: 'comms', stations: 'comms', trackHoursPerDay: 'comms',
-  reservePct: 'resources', insurance: 'resources',
-};
 
 /** How the difficulty scales the scenario's budget and schedule, and what it switches on. */
 export const DIFFICULTY: Record<Difficulty, { name: string; explain: string; budget: number; deadline: number; events: boolean; advanced: boolean }> = {

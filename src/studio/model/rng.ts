@@ -28,14 +28,3 @@ export function createRng(seed: number): Rng {
   for (let i = 0; i < 15; i++) next(); // warm-up
   return { next, seed: seed >>> 0 };
 }
-
-/** Seeds are shown to players as "7F3A-91C2". */
-export const formatSeed = (seed: number): string => {
-  const hex = (seed >>> 0).toString(16).toUpperCase().padStart(8, '0');
-  return `${hex.slice(0, 4)}-${hex.slice(4)}`;
-};
-
-export const parseSeed = (text: string): number | null => {
-  const hex = text.replace(/[^0-9a-fA-F]/g, '');
-  return hex.length === 8 ? parseInt(hex, 16) >>> 0 : null;
-};

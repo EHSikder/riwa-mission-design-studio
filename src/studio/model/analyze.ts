@@ -25,9 +25,7 @@ import {
 } from './orbit';
 import { LUNAR_SITES, REGIONS, regionArea, type RegionId } from './regions';
 import { SCENARIOS, activeRequirements, type Objective, type Requirement, type Scenario } from './scenarios';
-import { RESOURCES, type Difficulty, type ResourceId, type RoleId } from './types';
-
-const DEG = Math.PI / 180;
+import { DEG, RESOURCES, type Difficulty, type ResourceId, type RoleId } from './types';
 
 export type Status = 'good' | 'warn' | 'fail' | 'over';
 
@@ -207,36 +205,35 @@ export function analyze(d: StudioDesign, difficulty: Difficulty = 'engineer'): A
   let capacityDay = 0, rateTyp = 0, rateWorst = 0, marginDb = -Infinity, contactMin = 0, passes = 0, rangeKm = 0, lightTime = 0, stationName = '—';
   let missionTbitCapacity = 0;
   const trackShare = Math.min(1, d.trackHoursPerDay / 24);
+  const earthGts = earthStations.map(stationGt).filter((x): x is number => x !== undefined);
+  const earthNames = earthStations.map((id) => STATIONS[id].short).join(' + ');
   if (access) {
-    const bits = access.contacts.reduce((acc, c) => {
-      const gt = stationGt(earthStations[c.station]);
-      return acc + (gt === undefined ? 0 : linkRate(ends(gt), c.rangeM).mbps * access!.stepS);
-    }, 0);
-    capacityDay = bits / 1000 / access.days;
+    // each contact's rate, worked out once
     const rates = access.contacts.map((c) => {
       const gt = stationGt(earthStations[c.station]);
       return gt === undefined ? 0 : linkRate(ends(gt), c.rangeM).mbps;
-    }).sort((a, b) => a - b);
+    });
+    const step = access.stepS;
+    capacityDay = sum(rates.map((r) => r * step)) / 1000 / access.days;
+    rates.sort((a, b) => a - b);
     rateTyp = rates.length ? rates[Math.floor(rates.length / 2)] : 0;
     rateWorst = rates.length ? rates[0] : 0;
     const far = access.contacts.length ? Math.max(...access.contacts.map((c) => c.rangeM)) : 0;
-    const gts = earthStations.map(stationGt).filter((x): x is number => x !== undefined);
-    marginDb = gts.length && far ? linkRate(ends(Math.max(...gts)), far).marginDb : -Infinity;
+    marginDb = earthGts.length && far ? linkRate(ends(Math.max(...earthGts)), far).marginDb : -Infinity;
     contactMin = sum(access.contactMinPerDay);
     passes = sum(access.passesPerDay);
     rangeKm = far / 1000;
     lightTime = far / 3e8;
-    stationName = earthStations.map((id) => STATIONS[id].short).join(' + ');
+    stationName = earthNames;
     missionTbitCapacity = (capacityDay * 365.25 * years) / 1000;
   } else if (geo) {
-    const gts = earthStations.map(stationGt).filter((x): x is number => x !== undefined);
-    const r = linkRate(ends(gts.length ? Math.max(...gts) : -Infinity), 38_600_000);
-    rateTyp = rateWorst = gts.length ? r.mbps : 0;
+    const r = linkRate(ends(earthGts.length ? Math.max(...earthGts) : -Infinity), 38_600_000);
+    rateTyp = rateWorst = earthGts.length ? r.mbps : 0;
     marginDb = r.marginDb;
-    contactMin = gts.length ? 1440 : 0;
+    contactMin = earthGts.length ? 1440 : 0;
     rangeKm = 38_600;
     lightTime = 0.129;
-    stationName = earthStations.map((id) => STATIONS[id].short).join(' + ') || '—';
+    stationName = earthNames || '—';
     capacityDay = (rateTyp * 86_400) / 1000;
   } else {
     // deep space: the best antenna listening for the hours bought each day
@@ -441,10 +438,7 @@ export function analyze(d: StudioDesign, difficulty: Difficulty = 'engineer'): A
     if (Math.max(p.size[0], p.size[1]) > l.fairingM) why.push(`The ${p.short} platform is wider than ${l.name}'s fairing (${f1(l.fairingM)} m).`);
     return { cap, price, why };
   };
-  const chosen = fit(d.launcher);
-  const capacityKg = chosen.cap;
-  const priceM = chosen.price;
-  const reasons = chosen.why;
+  const { cap: capacityKg, price: priceM, why: reasons } = fit(d.launcher);
   for (const r of reasons) issue('fail', 'director', r, 'Choose another launcher, or make the spacecraft lighter.', 'mass');
   // a cheaper rocket that could do the same job is money left on the table
   const launchOptions = s.launchers.map((id) => ({ id, ...fit(id) }));
@@ -512,8 +506,9 @@ export function analyze(d: StudioDesign, difficulty: Difficulty = 'engineer'): A
 
   // lifetime: whichever runs out first
   const ballisticEnd = (2.2 * dragArea) / Math.max(1, dryKg + propKg / 2);
+  const decayEnd = decayYears(facts.altKm, ballisticEnd);
   const limits: Line[] = [{ name: 'Planned operations', value: years }];
-  if (lowEarth && prop.isp === 0) limits.push({ name: 'Orbit decay (no engine to hold altitude)', value: decayYears(facts.altKm, ballisticEnd) });
+  if (lowEarth && prop.isp === 0) limits.push({ name: 'Orbit decay (no engine to hold altitude)', value: decayEnd });
   if (perYear > 0 && prop.isp > 0) limits.push({ name: 'Propellant', value: Math.max(0, capability - dvFixed) / perYear });
   if (Number.isFinite(batteryLifeYears)) limits.push({ name: 'Battery wear', value: batteryLifeYears });
   // low-orbit instruments by maturity; deep-space and GEO payloads are built for their radiation
@@ -522,9 +517,7 @@ export function analyze(d: StudioDesign, difficulty: Difficulty = 'engineer'): A
   if (bolW > requiredW && cell.degradationPerYear > 0) limits.push({ name: 'Solar cell ageing', value: Math.log(requiredW / bolW) / Math.log(1 - cell.degradationPerYear) - transferYears });
   const lifetimeYears = Math.max(0, Math.min(...limits.map((l) => l.value)));
   const lifeLimiter = limits.reduce((a, b) => (b.value < a.value ? b : a));
-  if (lowEarth && prop.isp === 0 && decayYears(facts.altKm, ballisticEnd) > years + 25) {
-    issue('warn', 'director', `At ${f0(facts.altKm)} km with no engine the satellite stays in orbit ~${f0(decayYears(facts.altKm, ballisticEnd))} years: space-debris rules ask for re-entry within 25 years of the end of the mission.`, 'Fly lower, or carry propulsion to de-orbit.');
-  }
+  if (lowEarth && prop.isp === 0 && decayEnd > years + 25) issue('warn', 'director', `At ${f0(facts.altKm)} km with no engine the satellite stays in orbit ~${f0(decayEnd)} years: space-debris rules ask for re-entry within 25 years of the end of the mission.`, 'Fly lower, or carry propulsion to de-orbit.');
   if (lifeLimiter.name.startsWith('Radiation') && lifetimeYears < years) issue('warn', 'spacecraft', `Radiation will wear out the electronics after ~${f1(lifetimeYears)} years.`, 'A radiation-hardened computer lasts much longer.');
 
   // ---------------------------------------------------------------- requirements
@@ -609,7 +602,7 @@ export function analyze(d: StudioDesign, difficulty: Difficulty = 'engineer'): A
         why = `Limited by ${lifeLimiter.name.toLowerCase()}: ${f1(lifetimeYears)} years.`;
         break;
       case 'capacity': {
-        value = sum(transponders.map((i) => i.throughputGbps ?? 0)) * powerFactor;
+        value = geoCapacity;
         why = `${transponders.map((i) => `${i.short} ${f2(i.throughputGbps!)} Gbps`).join(' + ') || 'No transponders'}${powerFactor < 1 ? `, but only ${f0(powerFactor * 100)}% can be powered` : ''}.`;
         break;
       }

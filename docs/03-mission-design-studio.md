@@ -305,6 +305,5 @@ src/studio/model/   pure TypeScript, tested with Vitest: catalogs, missions, reg
 src/studio/ui/      React: mission select, brief, desks, dashboard, review and poll, flight, report, team, help
 src/studio/three/   React Three Fiber: the spacecraft, built from the design
 src/studio/net/     the room client (Server-Sent Events plus POST)
-src/sim/            physical constants, seeded random numbers and link-budget basics
 server/             the game's own server: the built files and the rooms
 ```

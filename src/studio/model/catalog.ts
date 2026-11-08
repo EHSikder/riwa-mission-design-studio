@@ -2,10 +2,8 @@
  * The studio's parts catalog: platforms (the structure), power, computers and storage, attitude control,
  * propulsion, radios and antennas, ground stations, launchers and orbit types. Masses kg, power W, cost $M
  * (US dollars, approximate recent prices), development time in months. Every entry carries a source note;
- * `estimate: true` marks engineering estimates and calibrations (shown with ⚠). Solar cells and the battery
- * reuse the sourced values of the crewed game's catalog (src/sim/design/catalog.ts).
+ * `estimate: true` marks engineering estimates and calibrations (shown with ⚠).
  */
-import { BATTERY, SOLAR_CELLS, type CellId } from '../../sim/design/catalog';
 import type { BodyId, Sourced } from './types';
 
 // ------------------------------------------------------------------ platforms (structure)
@@ -87,22 +85,22 @@ export const INTEGRATION_MASS_FRACTION = 0.06;
 export const AIT_COST_FRACTION = 0.15;
 
 // ------------------------------------------------------------------ power
-export type { CellId };
+export type CellId = 'gaas3j' | 'si';
 export type ArrayMountId = 'body' | 'deployed' | 'tracking';
 
-export const CELLS: Record<CellId, (typeof SOLAR_CELLS)[CellId] & { degradationPerYear: number; explain: string }> = {
+// ageing: SMAD 3rd ed. Table 11-34 (Si 3.75%/yr); multi-junction ≈ 0.5%/yr (estimate)
+export const CELLS: Record<CellId, Sourced & { name: string; efficiency: number; kgPerM2: number; costPerM2M: number; degradationPerYear: number; explain: string }> = {
   si: {
-    ...SOLAR_CELLS.si,
-    degradationPerYear: 0.0375,
+    name: 'Silicon', efficiency: 0.16, kgPerM2: 2.2, costPerM2M: 0.12, degradationPerYear: 0.0375,
     explain: 'Cheaper cells, but they turn only ~16% of sunlight into electricity and wear out faster in radiation.',
+    source: 'Space-grade Si cells ~14–17%; areal mass and cost are estimates', estimate: true,
   },
   gaas3j: {
-    ...SOLAR_CELLS.gaas3j,
-    degradationPerYear: 0.005,
+    name: 'Triple-junction GaAs', efficiency: 0.3, kgPerM2: 2.6, costPerM2M: 0.35, degradationPerYear: 0.005,
     explain: 'Triple-junction gallium-arsenide cells: about twice as efficient as silicon and they age slowly, but they cost more.',
+    source: 'NASA Small Spacecraft SOA (multi-junction III-V > 30%); areal mass and cost are estimates', estimate: true,
   },
 };
-export const CELL_DEGRADATION_SOURCE = 'SMAD 3rd ed. Table 11-34 (Si 3.75%/yr); multi-junction ≈ 0.5%/yr (estimate)';
 
 /** Cells cover 85% of a panel; wiring, temperature and mismatch losses leave 77% of the rest (SMAD inherent degradation). */
 export const PANEL_FACTOR = 0.85 * 0.77;
@@ -144,8 +142,9 @@ export const ARRAY_MOUNTS: Record<ArrayMountId, ArrayMount> = {
   },
 };
 
-export const BATTERY_WH_PER_KG = BATTERY.whPerKg;
-export const BATTERY_COST_PER_WH_M = BATTERY.costPerKwhM / 1000;
+/** Li-ion at pack level: ~100–150 Wh/kg (cells up to 265 Wh/kg, NASA SOA); $0.5M per kWh. */
+export const BATTERY_WH_PER_KG = 150;
+export const BATTERY_COST_PER_WH_M = 0.5 / 1000;
 /** Battery cycles to failure at depth of discharge `dod` (Li-ion, trend of published test data; estimate). */
 export const batteryCycleLife = (dod: number) => Math.min(100_000, 50_000 * (0.2 / Math.max(dod, 0.01)) ** 2);
 /** Power control and distribution unit, scaled with the array's output. */
