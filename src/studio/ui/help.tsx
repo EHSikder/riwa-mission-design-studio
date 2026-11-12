@@ -9,7 +9,7 @@ import { GLOSSARY } from '../model/glossary';
 import { ROLES } from '../model/types';
 import { useStudio } from '../state';
 
-const KEY = 'riwa.studio.help';
+const KEY = 'underdogs.studio.help';
 const SCALES = [1, 1.15, 1.3];
 
 interface Help {

@@ -7,7 +7,7 @@ import type { StudioDesign } from './model/design';
 import type { Report } from './model/score';
 import type { Difficulty, ScenarioId } from './model/types';
 
-const KEY = 'riwa.studio.v1';
+const KEY = 'underdogs.studio.v1';
 
 export interface SavedDesign {
   id: string;

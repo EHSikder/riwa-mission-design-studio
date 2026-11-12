@@ -65,7 +65,7 @@ export function MissionSelect() {
   return (
     <div className="st-setup" onKeyDown={(e) => { if (e.key === 'Escape' && back) setStep(back); }}>
       <header className="st-setup-head">
-        <div className="st-brand"><b>RIWA</b><span>Mission Design Studio</span></div>
+        <div className="st-brand"><b>Space Underdogs</b><span>Mission design game</span></div>
         {step !== 'join' && (
           <ol className="st-setup-steps" aria-label="Setting up the game">
             {STEPS.map((s, k) => (

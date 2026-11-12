@@ -1,0 +1,13 @@
+# Render Blueprint (Render dashboard → New → Blueprint): the game with its own Node.js server, so network rooms
+# work. The free plan sleeps after 15 minutes without visitors, and the next visitor waits about a minute.
+services:
+  - type: web
+    name: space-underdogs
+    runtime: node
+    plan: free
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/info
+    envVars:
+      - key: NODE_VERSION
+        value: "22"

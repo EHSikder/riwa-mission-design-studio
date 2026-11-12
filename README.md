@@ -1,6 +1,6 @@
-# RIWA Mission Design Studio
+# Space Underdogs
 
-A browser game for the NASA Space Apps 2026 challenge [Space Mission Design Game](https://www.spaceappschallenge.org/2026/challenges/space-mission-design-game/). Players design, manage and simulate a complete space mission, alone or as a team of up to four:
+A browser game by team Space Underdogs for the NASA Space Apps 2026 challenge [Space Mission Design Game](https://www.spaceappschallenge.org/2026/challenges/space-mission-design-game/). Players design, manage and simulate a complete space mission, alone or as a team of up to four:
 
 1. Choose what the mission is for.
 2. Design the spacecraft and pick its instruments.
@@ -10,7 +10,7 @@ A browser game for the NASA Space Apps 2026 challenge [Space Mission Design Game
 6. Read why it worked or failed.
 7. Change the design and fly again.
 
-**Play it:** [add your public link here]
+**Play it:** [add your Vercel link here] · with network rooms: [add your Render link here]
 
 ## Run it yourself
 
@@ -31,7 +31,7 @@ Open http://localhost:5173. The terminal also shows the address teammates on the
 | `npm start` | Serves an existing build, with network rooms |
 | `npm run check` | Type-checks the code and runs all the tests |
 
-To publish it: `npm run build` makes a static site in `dist/` that works on any host (`.github/workflows/pages.yml` does this for GitHub Pages), but network rooms are off there. A Node.js host runs `npm run build`, then `npm start`, and has everything.
+To publish it: `npm run build` makes a static site in `dist/` that works on any static host. On Vercel (settings in `vercel.json`) that is the whole game except network rooms, which need a server. On Render (`render.yaml`) the game's own Node.js server runs it with network rooms: it builds with `npm ci && npm run build` and starts with `npm start`.
 
 ## What is in the game
 

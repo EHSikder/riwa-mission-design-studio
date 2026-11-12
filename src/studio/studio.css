@@ -1,4 +1,4 @@
-/* RIWA Mission Design Studio, in the RIWA design system: ink and two blues on a navy ground. Status is the only
+/* Space Underdogs, in its design system: ink and two blues on a navy ground. Status is the only
    other colour (good, thin, fails) and it always comes with an icon and a word. Scoped under .studio. */
 .studio {
   --ink: #151b35;
@@ -105,6 +105,13 @@
 .st-step-name { font-style: normal; }
 /* on a laptop, only the current phase keeps its name in the top bar */
 @media (max-width: 1600px) { .st-steps button:not(.on) .st-step-name { display: none; } }
+/* on laptops the mission name gives way first, then the difficulty chip; below that the bar scrolls sideways */
+@media (max-width: 1500px) {
+  .st-top { gap: 8px; }
+  .st-name { width: auto; flex: 0 1 210px; min-width: 110px; }
+}
+@media (max-width: 1320px) { .st-top .st-chip.dim { display: none; } }
+@media (max-width: 1240px) { .st-top { overflow-x: auto; } }
 .st-actions { display: flex; gap: 6px; margin-left: 10px; }
 .st-actions button { white-space: nowrap; }
 .st-body { flex: 1; min-height: 0; position: relative; }

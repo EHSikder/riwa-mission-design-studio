@@ -9,7 +9,7 @@ export default defineConfig({
     react(),
     // the rooms for network team play, also while developing
     {
-      name: 'riwa-rooms',
+      name: 'underdogs-rooms',
       configureServer(server) { server.middlewares.use(roomHandler); },
       configurePreviewServer(server) { server.middlewares.use(roomHandler); },
     },

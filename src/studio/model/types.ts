@@ -1,5 +1,5 @@
 /**
- * The Mission Design Studio's shared vocabulary (docs/03) and physical constants (sources: REFERENCES.md). The
+ * The game's shared vocabulary (docs/03) and physical constants (sources: REFERENCES.md). The
  * models work in SI units (m, s, kg, W); catalog fields carry their unit in the name (altKm, costM in US$
  * millions, dataMbps, powerW, devMonths).
  */

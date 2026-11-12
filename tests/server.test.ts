@@ -17,7 +17,7 @@ describe('the game server', () => {
   let port = 0;
   let dir = '';
   beforeAll(async () => {
-    dir = mkdtempSync(join(tmpdir(), 'riwa-server-'));
+    dir = mkdtempSync(join(tmpdir(), 'underdogs-server-'));
     mkdirSync(join(dir, 'build', 'assets'), { recursive: true });
     writeFileSync(join(dir, 'build', 'index.html'), '<!doctype html><title>game</title>');
     writeFileSync(join(dir, 'build', 'assets', 'index-AbCd1234.js'), 'console.log("game");'.repeat(100));
@@ -89,7 +89,7 @@ describe('the game server', () => {
   });
 
   it('shows network addresses only on a local network, not behind a public name', async () => {
-    const pub = await raw('/api/info', 'GET', { Host: 'riwa.example.org' });
+    const pub = await raw('/api/info', 'GET', { Host: 'underdogs.example.org' });
     expect(JSON.parse(pub.body.toString())).toEqual({ addresses: [] });
   });
 

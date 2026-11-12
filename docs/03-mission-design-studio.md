@@ -1,4 +1,4 @@
-# The RIWA Mission Design Studio: design
+# Space Underdogs: design
 
 How the game is designed and what is built. Written for teammates and judges who want more than the README.
 

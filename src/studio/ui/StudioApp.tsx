@@ -1,5 +1,5 @@
 /**
- * The RIWA Mission Design Studio (docs/03): mission select → brief → design desks → review → fly → report.
+ * Space Underdogs, the mission design game (docs/03): mission select → brief → design desks → review → fly → report.
  * A 2D application with a 3D spacecraft view.
  */
 import { useEffect } from 'react';
@@ -39,8 +39,8 @@ function TopBar() {
   return (
     <header className="st-top">
       <div className="st-brand">
-        <b>RIWA</b>
-        <span>Mission Design Studio</span>
+        <b>Space Underdogs</b>
+        <span>Mission design game</span>
       </div>
       <input
         className="st-name"

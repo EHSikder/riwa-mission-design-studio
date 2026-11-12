@@ -1,4 +1,4 @@
-/* The RIWA design system's type: Archivo for everything, Newsreader italic for one word of emphasis, JetBrains Mono for labels and data. */
+/* The design system's type: Archivo for everything, Newsreader italic for one word of emphasis, JetBrains Mono for labels and data. */
 :root {
   --sans: 'Archivo', 'Helvetica Neue', Arial, sans-serif;
   --serif: 'Newsreader', Georgia, serif;

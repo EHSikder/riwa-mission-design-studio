@@ -1,5 +1,5 @@
 /**
- * Step 5A: the Mission Design Studio's model. The physics against textbook values, the link budgets against
+ * Step 5A: the game's model. The physics against textbook values, the link budgets against
  * real missions, the ground-track coverage engine, and every scenario's reference design closing.
  */
 import { describe, expect, it } from 'vitest';
