@@ -59,6 +59,8 @@ export interface TeamState {
   votes: Record<number, Record<string, string>>;
   /** Player → design changes made (contribution). */
   edits: Record<string, number>;
+  /** Someone has picked a role by hand: new players no longer reshuffle the roles. */
+  manual?: boolean;
 }
 
 export type TeamOp =
@@ -110,14 +112,14 @@ export function teamReduce(s: TeamState, op: TeamOp): TeamState {
     case 'join': {
       if (s.players.some((p) => p.id === op.player.id) || s.players.length >= MAX_PLAYERS) return s;
       const players = [...s.players, { ...op.player, color: PLAYER_COLORS[s.players.length % PLAYER_COLORS.length] }];
-      // the first player holds every role until others claim theirs
-      const roles = s.players.length === 0 ? defaultRoles(players) : s.roles;
+      // the roles are shared out again as each player arrives, until someone picks by hand
+      const roles = s.manual ? s.roles : defaultRoles(players);
       return { ...s, players, roles, active: s.active || op.player.id };
     }
     case 'active':
       return { ...s, active: op.player };
     case 'claim':
-      return { ...s, roles: { ...s.roles, [op.role]: op.player } };
+      return { ...s, roles: { ...s.roles, [op.role]: op.player }, manual: true };
     case 'alloc':
       return { ...s, allocations: op.allocations };
     case 'request':

@@ -1,12 +1,13 @@
 /**
- * The mission's six resources, always in view (docs/03 §3): each with its value, its limit, a bar, a status that
- * carries a word and an icon (never colour alone), and the reason behind it one click away. Under them: the
- * requirements as predicted right now, and the problems, each with the role that owns it and a fix.
+ * The mission's six resources, its requirements and its problems (docs/03 §3). Each group is a button that opens
+ * with a click; closed, it still shows how things stand at a glance. A resource has a sweet spot, not a "more is
+ * better": its gauge shows too little, just right and more than needed, and says why each end is a problem.
  */
 import { useState, type JSX } from 'react';
 import type { Analysis, Issue, ResourceSummary } from '../model/analyze';
 import { ROLES, type ResourceId } from '../model/types';
-import { StatusBadge } from './controls';
+import { useStudio } from '../state';
+import { GaugeBar, StatusBadge } from './controls';
 import { MetBadge } from './desks';
 
 const ICONS: Record<ResourceId, JSX.Element> = {
@@ -26,11 +27,12 @@ export function ResourceIcon({ id }: { id: ResourceId }) {
   );
 }
 
+export const RESOURCE_ORDER: ResourceId[] = ['mass', 'power', 'budget', 'data', 'comms', 'time'];
+
 function ResourceCard({ r }: { r: ResourceSummary }) {
   const [open, setOpen] = useState(false);
-  const share = r.limit > 0 && Number.isFinite(r.limit) ? Math.min(1.25, Math.max(0, r.value / r.limit)) : 0;
   return (
-    <button type="button" className={`st-res ${r.status} ${r.critical ? 'critical' : ''}`} onClick={() => setOpen(!open)} aria-expanded={open}>
+    <button type="button" className={`st-res ${r.status} ${r.critical ? 'critical' : ''}`} onClick={() => setOpen(!open)} aria-expanded={open} data-sfx={open ? 'close' : 'open'}>
       <span className="st-res-top">
         <span className="st-res-icon"><ResourceIcon id={r.id} /></span>
         <b>{r.name}</b>
@@ -38,10 +40,7 @@ function ResourceCard({ r }: { r: ResourceSummary }) {
         <StatusBadge status={r.status} />
       </span>
       <span className="st-res-head">{r.headline}</span>
-      <span className="st-bar" aria-hidden>
-        <span style={{ width: `${(share / 1.25) * 100}%` }} />
-        <i style={{ left: '80%' }} />
-      </span>
+      {r.gauge ? <GaugeBar g={r.gauge} open={open} /> : null}
       {open && <span className="st-res-why">{r.why}</span>}
     </button>
   );
@@ -87,24 +86,46 @@ function ReqRow({ r }: { r: Analysis['requirements'][number] }) {
   );
 }
 
+/** A panel on the right that opens and closes; its summary shows while closed. */
+function Fold(props: { id: string; title: string; summary: JSX.Element | string; children: JSX.Element }) {
+  const open = useStudio((s) => !!s.folds[props.id]);
+  const toggle = useStudio((s) => s.toggleFold);
+  return (
+    <section className={`st-rfold ${open ? 'open' : ''}`}>
+      <button type="button" className="st-rfold-btn" aria-expanded={open} data-sfx={open ? 'close' : 'open'} data-guide={`fold:${props.id}`} onClick={() => toggle(props.id)}>
+        <span className="st-rfold-title">{props.title}</span>
+        <span className="st-rfold-sum">{props.summary}</span>
+        <span className="st-chev" aria-hidden />
+      </button>
+      {open && <div className="st-rfold-body st-reveal-fast">{props.children}</div>}
+    </section>
+  );
+}
+
 export function Dashboard({ a }: { a: Analysis }) {
   const fails = a.issues.filter((i) => i.level === 'fail').length;
   const warns = a.issues.filter((i) => i.level === 'warn').length;
+  const met = a.requirements.filter((r) => r.met !== 'fail').length;
+  const rs = RESOURCE_ORDER.map((id) => a.resources[id]);
   return (
     <div className="st-dash">
-      <h3>Resources <span className="st-sub">tap a card for the why</span></h3>
-      <div className="st-res-grid">
-        {(['mass', 'power', 'budget', 'data', 'comms', 'time'] as ResourceId[]).map((id) => <ResourceCard key={id} r={a.resources[id]} />)}
-      </div>
-      <h3>Requirements <span className="st-sub">predicted</span></h3>
-      <ul className="st-reqmini-list">
-        {a.requirements.map((r) => <ReqRow key={r.req.id} r={r} />)}
-      </ul>
-      <h3>
-        Problems{' '}
-        <span className="st-sub">{fails ? `${fails} blocking` : 'none blocking'}{warns ? ` · ${warns} warnings` : ''}</span>
-      </h3>
-      <IssueList issues={a.issues} />
+      <Fold
+        id="resources"
+        title="Resources"
+        summary={
+          <span className="st-res-dots">
+            {rs.map((r) => <span key={r.id} className={`st-res-dot ${r.status}`} title={`${r.name}: ${r.headline}`}><ResourceIcon id={r.id} /></span>)}
+          </span>
+        }
+      >
+        <div className="st-res-grid">{rs.map((r) => <ResourceCard key={r.id} r={r} />)}</div>
+      </Fold>
+      <Fold id="requirements" title="Requirements" summary={<span className={met === a.requirements.length ? 'st-ok' : 'st-bad'}>{met} of {a.requirements.length} met</span>}>
+        <ul className="st-reqmini-list">{a.requirements.map((r) => <ReqRow key={r.req.id} r={r} />)}</ul>
+      </Fold>
+      <Fold id="problems" title="Problems" summary={<span className={fails ? 'st-bad' : warns ? 'st-warnword' : 'st-ok'}>{fails ? `${fails} blocking` : 'none blocking'}{warns ? ` · ${warns} warnings` : ''}</span>}>
+        <IssueList issues={a.issues} />
+      </Fold>
     </div>
   );
 }

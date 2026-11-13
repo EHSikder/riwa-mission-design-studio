@@ -1,27 +1,73 @@
-# Space Underdogs
+# RIWA Space Journey
 
-A browser game by team Space Underdogs for the NASA Space Apps 2026 challenge [Space Mission Design Game](https://www.spaceappschallenge.org/2026/challenges/space-mission-design-game/). Players design, manage and simulate a complete space mission, alone or as a team of up to four:
+We're team **Space Underdogs**, and this is our game for the NASA Space Apps 2026 challenge [Space Mission Design Game](https://www.spaceappschallenge.org/2026/challenges/space-mission-design-game/).
 
-1. Choose what the mission is for.
-2. Design the spacecraft and pick its instruments.
-3. Choose the orbit and the rocket.
-4. Keep six resources in balance: mass, power, money, data, communications and time.
-5. Fly the mission through years of operations and surprises.
-6. Read why it worked or failed.
-7. Change the design and fly again.
+In RIWA Space Journey you build and fly a whole space mission, alone or with up to three friends. You start with an empty assembly stand, and nothing is built for you:
 
-**Play it:** [add your Vercel link here] · with network rooms: [add your Render link here]
+1. Pick what the mission is for and how ambitious you want to be.
+2. Build the spacecraft part by part: structure, solar arrays, battery, computer, pointing, engine, instruments, radio.
+3. Pick the orbit and the rocket.
+4. Keep six things in balance: mass, power, money, data, communications and time.
+5. Plan your ground tests, then run them yourself before launch.
+6. Watch the launch, unfold the spacecraft, find the first signal.
+7. Fly through years of operations. Things will break, and you get the telemetry to figure out why.
+8. Read the report, see why it went that way, change the design and fly again.
+
+**Play it:** [add your Vercel link here] · [add your Render link here]
+
+## The missions
+
+| Mission | What you build | What you learn |
+|---|---|---|
+| **First Light** (tutorial) | A small CubeSat that takes pictures of Angola | One idea per step: payload, pointing, power, battery, data |
+| **Angola from Above** | An Earth observation satellite for crops, floods, the coast, forests and cities | Sharp pictures vs wide coverage vs how often you pass over, clouds vs radar, where to put ground stations |
+| **Connecting Angola** | A geostationary TV and internet satellite, ANGOSAT style | Power hungry transponders, rain fade, fuel for 15 years |
+| **Far Side Relay** | A relay so landers on the far side of the Moon can talk to Earth | Lunar orbits, distance vs data rate, renting deep space antennas |
+| **Red Planet Orbiter** | A science orbiter for Mars | Launch windows every 26 months, aerobraking, weak sunlight, long links |
+| **Crew Around the Moon** | A capsule (call sign *Palanca*, after Angola's giant sable) that takes astronauts around the Moon and back | Life support, radiation, storm shelters, escape systems, heat shields, and getting everyone home |
+
+The crewed mission is built on Artemis II, which flew four people around the Moon in April 2026. With people on board the first requirement isn't science anymore. It's that the crew comes home.
+
+## Five levels
+
+- **Guided:** for people who know nothing about space. A mission guide lights up the exact button to press next and marks a choice that works. It's not AI, it's the same checks the game always runs, pointed at the screen.
+- **Cadet:** more money and time, a coach, no random failures.
+- **Engineer:** the real numbers, and things go wrong.
+- **Expert:** a tight budget, advanced options, more surprises.
+- **Sandbox:** no limits, just try stuff.
+
+## Playing as a team
+
+Five roles (Mission Director, Spacecraft Engineer, Science Lead, Communications Lead, Resource Manager) shared between 1 to 4 players. The game shares them out for you, and you can move any role with one click.
+
+- **On one screen:** everyone around one laptop or a TV. Each desk has an owner, and when you open a desk the controls go to its owner. Steps during the flight go to their owner too.
+- **Online, each on their own computer:** open the Render link, choose Team online, share the 4 letter room code. Works from anywhere.
+- **Same room, no internet:** one laptop runs `npm run lan` and everyone on the same Wi-Fi opens the address it prints.
+
+The Resource Manager splits mass, power and money between the desks, and going over takes a change request. Every role has a secret goal that pulls against the others, so you have to negotiate. Launch needs a GO from every role, and decisions in flight are voted on.
+
+## What makes it feel real
+
+We looked at how real space teams work and built the game around that.
+
+- **Concurrent design.** NASA JPL's Team X and ESA's Concurrent Design Facility put every subsystem engineer in one room, each at their own station, all working on one shared design. That's what the desks are.
+- **Phases and reviews.** NASA runs projects in phases (concept, design, build and test, operations) with a review board at each gate. So the game goes Brief, Design, Review, Build and fly, Report.
+- **Test as you fly.** Every build hides a few flaws. A vibration test, a thermal vacuum test, a deployment test, a radio test and a mission rehearsal each find one kind. Skip a test and that flaw flies with you, and shows up after launch.
+- **Problems come as telemetry.** When something breaks in orbit you don't get told the answer. You get the readings (currents, temperatures, pressures, what each sensor says) and pick a fix. The right one works within a day, a wrong guess costs days, and "safe mode and investigate" is slow but always works. That's how flight controllers actually do it.
+- **Sweet spots, not "more is better".** Every resource gauge shows too little, just right and more than needed. More power than you need sounds fine, but it's extra mass, money and drag that could have bought something useful, so the game tells you that too.
+
+Plus: a 3D spacecraft that grows as you build it (with an x-ray to see inside) and flies the camera to whatever you just changed, a launch show with countdown and sound, sound effects everywhere (you can mute them), a hangar to save designs and compare them side by side, share links, a score out of 1000 with a full report, "fly again with the same luck" so you can test one change fairly, a local leaderboard and a network one.
 
 ## Run it yourself
 
-Needs Node.js 20.19 or newer and a browser with WebGL2.
+You need Node.js 20.19 or newer and a browser with WebGL2.
 
 ```bash
 npm install
 npm run lan
 ```
 
-Open http://localhost:5173. The terminal also shows the address teammates on the same Wi-Fi can use.
+Then open http://localhost:5173. The terminal also shows the address your teammates on the same Wi-Fi can use.
 
 | Command | What it does |
 |---|---|
@@ -29,46 +75,28 @@ Open http://localhost:5173. The terminal also shows the address teammates on the
 | `npm run dev` | The same game for working on the code, with live reload |
 | `npm run build` | Builds the game into `dist/` (works on any static host) |
 | `npm start` | Serves an existing build, with network rooms |
-| `npm run check` | Type-checks the code and runs all the tests |
+| `npm run check` | Type checks the code and runs all the tests |
 
-To publish it: `npm run build` makes a static site in `dist/` that works on any static host. On Vercel (settings in `vercel.json`) that is the whole game except network rooms, which need a server. On Render (`render.yaml`) the game's own Node.js server runs it with network rooms: it builds with `npm ci && npm run build` and starts with `npm start`.
-
-## What is in the game
-
-| Mission | Customer and goal | What it teaches |
-|---|---|---|
-| **First Light** (tutorial) | A 12U CubeSat that photographs Angola | Payload, pointing, power, batteries, data rate: one idea per step |
-| **Angola from Above** | Earth observation for Angola: crops, floods, coast and oil spills, forests, cities | Resolution against swath against revisit; clouds and radar; where to put ground stations |
-| **Connecting Angola** | An ANGOSAT-style geostationary communications satellite | Power-hungry transponders, rain fade by band, propellant for 15 years, electric orbit raising |
-| **Far Side Relay** | A relay linking landers on the far side of the Moon to Earth | Halo, elliptical and low lunar orbits; distance against data rate; renting deep-space antennas |
-| **Red Planet Orbiter** | A Mars science orbiter: minerals, climate, buried ice, landing sites | Launch windows every 26 months, aerobraking, long-distance links, solar power at Mars |
-
-- **Difficulty:** Cadet (a coach, no random failures), Engineer (the real numbers), Expert (a tight budget, advanced options), Sandbox (no limits).
-- **Team play:** five roles over one to four players, on one screen or across a network. The Resource Manager splits mass, power and money; going over takes a change request. Each role has a secret goal that pulls against the others. Launch needs a GO from every role, and flight decisions are voted on.
-- **Live consequences:** a dashboard of the six resources, and a feed that says what each change did and why.
-- **Score and report:** out of 1 000, with every requirement as predicted and as flown, what worked, what limited the mission and what to try next. "Fly again (same luck)" replays the same random events.
-- **Save and share:** designs are saved in the browser or shared as a link; there is a local leaderboard and, on a network, a leaderboard of every team.
-- **Help:** a tutorial, a coach, a searchable glossary, an explanation on every control, larger text, keyboard operation and reduced motion.
+**Publishing:** Vercel (settings in `vercel.json`) serves the built game as plain files. Render (`render.yaml`) runs the game's own small server, so online rooms work there. If you want the Vercel copy to have online rooms too, set `VITE_ROOMS_URL` to your Render link in Vercel's environment variables and redeploy. The Render server allows that.
 
 ## How it works
 
-The models are simple, but every formula is real: Kepler orbits, the sun-synchronous tilt from J2, eclipses from the beta angle, drag decay, coverage sampled from a real ground track, link budgets with tropical rain fade, the rocket equation, launcher capacity to each destination, and battery wear. Numbers carry their source in the code, and estimates are marked in the game. The design is in [docs/03-mission-design-studio.md](docs/03-mission-design-studio.md).
+The models are simple but the formulas are real: Kepler orbits, the sun-synchronous tilt from J2, eclipses from the beta angle, drag decay, coverage from a real ground track, link budgets with tropical rain fade, the rocket equation, launcher capacity, battery wear, life support mass per crew-day, radiation dose. Numbers carry their source in the code and our own estimates are marked in the game. The design is in [docs/03-mission-design-studio.md](docs/03-mission-design-studio.md).
 
-Built with TypeScript, Vite, React, React Three Fiber (three.js), zustand and Vitest.
+Built with TypeScript, Vite, React, React Three Fiber (three.js), zustand and Vitest. Sound effects are made in the browser with Web Audio, so there are no sound files.
 
 ```
-src/studio/model/   the model: catalogs, missions, regions, orbit, coverage and link models, the consequence
-                    engine (analyze.ts), the mission run (simulate.ts), scoring, team rules, coach, glossary
-src/studio/ui/      the screens: mission select, desks, dashboard, flight, report, team, help
+src/studio/model/   catalogs, missions, orbits, coverage and links, the consequence engine (analyze.ts),
+                    the flight (simulate.ts) and its events (events.ts), tests and flaws, crew systems,
+                    scoring, team rules, coach, glossary
+src/studio/ui/      the screens: missions, desks, dashboard, flight, launch show, report, team, help, sound
 src/studio/three/   the 3D spacecraft, built from the design
 src/studio/net/     the room client
 server/             the game's own server: the built files and the rooms for network play (no dependencies)
-tests/              model, physics, coverage, simulation, team and server tests
+tests/              model, physics, coverage, build, flight, crew, team and server tests
 ```
 
 ### Adding the GGPEN data sets
-
-The challenge's data sets are due on 13 November 2026.
 
 | Data | Where it goes |
 |---|---|
@@ -80,6 +108,6 @@ The challenge's data sets are due on 13 November 2026.
 ## Licence, sources and AI use
 
 - **Licence:** Apache License 2.0, see [LICENSE](LICENSE).
-- **Sources:** every data source and software package is listed in [REFERENCES.md](REFERENCES.md).
-- **AI use:** the code, tests and documents were written with Claude Code (Anthropic) under the team's direction; the metadata of `index.html` records this too. The game contains no AI-generated images, video or audio.
-- This project is not endorsed by NASA or GGPEN and does not use their insignia.
+- **Sources:** every data source and software package is in [REFERENCES.md](REFERENCES.md).
+- **AI use:** the code, tests and documents were written with Claude Code (Anthropic) while we directed it, and the metadata of `index.html` says so too. The sound effects are generated by that code in your browser (tones and noise), they aren't recordings or AI audio. The game has no AI-generated images or video.
+- This project isn't endorsed by NASA or GGPEN and doesn't use their insignia.

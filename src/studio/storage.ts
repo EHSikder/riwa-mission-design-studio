@@ -56,6 +56,15 @@ export function saveDesign(design: StudioDesign): SavedDesign {
   return entry;
 }
 
+/** Saved designs for one mission, newest first. */
+export const listDesigns = (scenario: ScenarioId) => read().designs.filter((x) => x.scenario === scenario);
+
+export function deleteDesign(id: string) {
+  const s = read();
+  s.designs = s.designs.filter((x) => x.id !== id);
+  write(s);
+}
+
 export function addScore(r: Report, scenario: ScenarioId, difficulty: Difficulty, team = 'Solo') {
   const s = read();
   s.scores = [...s.scores, { scenario, difficulty, name: r.name, team, total: r.score.total, rank: r.score.rank, outcome: r.outcome, at: Date.now() }].slice(-500);

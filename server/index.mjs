@@ -118,7 +118,7 @@ function start() {
     process.exit(1);
   });
   server.listen(port, '0.0.0.0', () => {
-    console.log(`\n  Space Underdogs\n\n  On this computer:   http://localhost:${port}`);
+    console.log(`\n  RIWA Space Journey (team Space Underdogs)\n\n  On this computer:   http://localhost:${port}`);
     for (const a of lanAddresses()) console.log(`  On the same Wi-Fi:  http://${a}:${port}`);
     console.log('\n  Press Ctrl+C to stop.\n');
   });

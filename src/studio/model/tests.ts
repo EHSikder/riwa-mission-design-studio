@@ -31,13 +31,13 @@ const deployables = (d: StudioDesign) => (d.mount !== 'body' && d.arrayM2 > 0) |
 
 export const TESTS: Record<TestId, TestSpec> = {
   vibration: {
-    name: 'Vibration test', short: 'Shake', role: 'spacecraft', finds: 'structure', weeks: 3, costShare: 0.02,
+    name: 'Vibration test', short: 'Shake', role: 'spacecraft', finds: 'structure', weeks: 2, costShare: 0.02,
     explain: 'The spacecraft is bolted to a shaker table and shaken as hard as the rocket will shake it.',
     catches: 'A cracked bracket or a loose connector that the launch would break.',
     applies: () => true,
   },
   tvac: {
-    name: 'Thermal vacuum test', short: 'Bake', role: 'spacecraft', finds: 'thermal', weeks: 5, costShare: 0.04,
+    name: 'Thermal vacuum test', short: 'Bake', role: 'spacecraft', finds: 'thermal', weeks: 4, costShare: 0.04,
     explain: 'Days in a chamber with no air, cycled between the heat of full sunlight and the cold of shadow.',
     catches: 'A part that overheats or freezes once there is no air to carry the heat away.',
     applies: () => true,
@@ -49,13 +49,13 @@ export const TESTS: Record<TestId, TestSpec> = {
     applies: deployables,
   },
   compat: {
-    name: 'Ground station compatibility test', short: 'Talk', role: 'comms', finds: 'rf', weeks: 2, costShare: 0.015,
+    name: 'Ground station compatibility test', short: 'Talk', role: 'comms', finds: 'rf', weeks: 1, costShare: 0.015,
     explain: 'The real radio talks to the real ground station through a cable: every command, every data format.',
     catches: 'A spacecraft in orbit that the ground cannot understand.',
     applies: (d) => d.antenna !== 'none',
   },
   rehearsal: {
-    name: 'Mission rehearsal', short: 'Rehearse', role: 'director', finds: 'software', weeks: 3, costShare: 0.015,
+    name: 'Mission rehearsal', short: 'Rehearse', role: 'director', finds: 'software', weeks: 2, costShare: 0.015,
     explain: 'The flight software runs for days against a simulator while the team practises its failures before they happen.',
     catches: 'A software fault that shows up in orbit, where a fix takes days.',
     applies: (d) => d.computer !== 'none',

@@ -1,8 +1,8 @@
 {
-  "name": "space-underdogs",
+  "name": "riwa-space-journey",
   "private": true,
   "version": "1.0.0",
-  "description": "Space Underdogs: design, manage and simulate a complete space mission, alone or as a team of up to four (NASA Space Apps 2026, Space Mission Design Game).",
+  "description": "RIWA Space Journey, by team Space Underdogs: design, build, test and fly a complete space mission, alone or as a team of up to four (NASA Space Apps 2026, Space Mission Design Game).",
   "license": "Apache-2.0",
   "type": "module",
   "engines": {

@@ -20,7 +20,7 @@ import { addScore } from './storage';
 export type Phase = 'select' | 'lobby' | 'brief' | 'design' | 'review' | 'fly' | 'report';
 
 export type StudioOp =
-  | { t: 'setup'; scenario: ScenarioId; difficulty: Difficulty; mode: TeamMode; players: Player[]; design?: StudioDesign }
+  | { t: 'setup'; scenario: ScenarioId; difficulty: Difficulty; mode: TeamMode; players: Player[]; design?: StudioDesign; roles?: Record<RoleId, string> }
   | { t: 'patch'; role: RoleId; by: string; changes: Partial<StudioDesign> }
   | { t: 'replace'; role: RoleId; by: string; design: StudioDesign; assisted?: boolean }
   | { t: 'phase'; phase: Phase }
@@ -36,6 +36,26 @@ export interface FeedNote {
   role: RoleId;
 }
 
+/** The part of the spacecraft a change touched, so the 3D view can show it. */
+export interface Focus {
+  part: string;
+  label: string;
+  /** What the change was, in a few words. */
+  text: string;
+  at: number;
+}
+
+/** Which design field belongs to which part of the spacecraft (the 3D view's names). */
+const PART_OF: Partial<Record<keyof StudioDesign, [string, string]>> = {
+  platform: ['body', 'Structure'], cells: ['arrays', 'Solar arrays'], mount: ['arrays', 'Solar arrays'], arrayM2: ['arrays', 'Solar arrays'],
+  batteryWh: ['battery', 'Battery'], computer: ['computer', 'Onboard computer'], redundant: ['computer', 'Spare computer'], adcs: ['adcs', 'Attitude control'],
+  propulsion: ['engine', 'Propulsion'], propellantMarginPct: ['engine', 'Propellant'], instruments: ['payload', 'Payload'],
+  band: ['antenna', 'Radio band'], antenna: ['antenna', 'Antenna'], dishM: ['antenna', 'Dish'], txW: ['antenna', 'Transmitter'], storageGbit: ['computer', 'Data storage'],
+  stations: ['ground', 'Ground stations'], trackHoursPerDay: ['ground', 'Antenna time'], launcher: ['rocket', 'Launcher'], crew: ['cabin', 'Crew systems'],
+  orbit: ['orbit', 'Orbit'], tests: ['tests', 'Test plan'], plannedYears: ['orbit', 'Mission length'], reservePct: ['money', 'Reserve'], insurance: ['money', 'Insurance'],
+  primary: ['brief', 'Objective'], secondary: ['brief', 'Objectives'], levels: ['brief', 'Requirements'],
+};
+
 export interface FlownReport extends Report {
   /** The design that flew, to compare and to go back to. */
   design: StudioDesign;
@@ -50,7 +70,12 @@ interface StudioState {
   analysis: Analysis | null;
   past: StudioDesign[];
   future: StudioDesign[];
-  desk: RoleId;
+  /** The desk open on the left (none: the spacecraft gets the room), its open sections, the open panels on the right. */
+  desk: RoleId | null;
+  sections: Record<string, boolean>;
+  folds: Record<string, boolean>;
+  /** The part the last change touched. */
+  focus: Focus | null;
   feed: FeedNote[];
   /** The example design was loaded: the decision score notes the help. */
   assisted: boolean;
@@ -66,14 +91,18 @@ interface StudioState {
   reports: FlownReport[];
   dispatch: (op: StudioOp) => void;
   /** A solo or same-screen game. */
-  start: (o: { scenario: ScenarioId; difficulty: Difficulty; mode: 'solo' | 'hotseat'; names: string[]; design?: StudioDesign }) => void;
+  start: (o: { scenario: ScenarioId; difficulty: Difficulty; mode: 'solo' | 'hotseat'; names: string[]; design?: StudioDesign; roles?: Record<RoleId, string> }) => void;
   begin: (s: ScenarioId, d: Difficulty, design?: StudioDesign) => void;
   /** Open a LAN room for this mission; returns its code. */
   host: (o: { scenario: ScenarioId; difficulty: Difficulty; name: string }) => string;
   join: (code: string, name: string) => void;
   teamOp: (op: TeamOp) => void;
   setPhase: (p: Phase) => void;
-  setDesk: (r: RoleId) => void;
+  /** Open a desk (and, on one shared screen, hand the controls to its owner). */
+  setDesk: (r: RoleId | null) => void;
+  toggleDesk: (r: RoleId) => void;
+  openSection: (id: string, open?: boolean) => void;
+  toggleFold: (id: string) => void;
   /** Change the design as `role`; the analysis, the feed and the team follow. */
   edit: (role: RoleId, change: (d: StudioDesign) => void) => void;
   loadExample: () => void;
@@ -81,6 +110,8 @@ interface StudioState {
   redo: () => void;
   /** Fly the current design (a fresh seed unless one is given: the same seed replays the same luck). */
   fly: (seed?: number) => void;
+  /** A hands-on step: its owner runs it, no vote. */
+  act: (option: string) => void;
   /** Solo: decide. Team: vote (as `player`, by default the one at this screen), and decide once everyone has, or `now`. */
   vote: (option: string, o?: { player?: string; now?: boolean }) => void;
   finish: () => void;
@@ -96,6 +127,13 @@ export const useStudio = create<StudioState>((set, get) => {
     const s = get();
     const a = analyze(next, s.difficulty);
     const notes = s.analysis ? diffNotes(s.analysis, a).map((n) => ({ ...n, id: noteId++, role })) : [];
+    // the part of the spacecraft this change touched
+    let focus = s.focus;
+    if (s.design && record) {
+      const changed = (Object.keys(next) as (keyof StudioDesign)[]).filter((k) => JSON.stringify(next[k]) !== JSON.stringify(s.design![k]));
+      const hit = changed.map((k) => PART_OF[k]).find(Boolean);
+      if (hit) focus = { part: hit[0], label: hit[1], text: notes[0]?.text ?? '', at: Date.now() };
+    }
     let team = s.team;
     if (team.mode !== 'solo') {
       team = teamReduce(team, { t: 'edited', player: by });
@@ -107,6 +145,7 @@ export const useStudio = create<StudioState>((set, get) => {
     set({
       design: next,
       analysis: a,
+      focus,
       team,
       past: record && s.design && s.team.mode !== 'lan' ? [...s.past.slice(-49), s.design] : s.past,
       future: record ? [] : s.future,
@@ -119,12 +158,12 @@ export const useStudio = create<StudioState>((set, get) => {
     switch (op.t) {
       case 'setup': {
         const design = cloneDesign(op.design ?? SCENARIOS[op.scenario].starter);
-        const team = newTeam(op.mode, op.players);
+        const team = { ...newTeam(op.mode, op.players), ...(op.roles ? { roles: op.roles, manual: true } : {}) };
         set({
           scenario: op.scenario, difficulty: op.difficulty, design, analysis: analyze(design, op.difficulty),
           past: [], future: [], feed: [], assisted: false, run: null, report: null, reports: [], decided: {},
           team: op.mode === 'lan' && s.me ? { ...team, active: s.me } : team,
-          phase: op.mode === 'lan' ? 'lobby' : op.design ? 'design' : 'brief', desk: 'director',
+          phase: op.mode === 'lan' ? 'lobby' : op.design ? 'design' : 'brief', desk: null, sections: {}, folds: {}, focus: null,
         });
         return;
       }
@@ -183,7 +222,10 @@ export const useStudio = create<StudioState>((set, get) => {
     analysis: null,
     past: [],
     future: [],
-    desk: 'director',
+    desk: null,
+    sections: {},
+    folds: {},
+    focus: null,
     feed: [],
     assisted: false,
     team: soloTeam(),
@@ -199,11 +241,12 @@ export const useStudio = create<StudioState>((set, get) => {
       if (room) room.send(op);
       else apply(op);
     },
-    start: ({ scenario, difficulty, mode, names, design }) => {
+    start: ({ scenario, difficulty, mode, names, design, roles }) => {
       get().room?.close();
-      const players = mode === 'solo' ? soloTeam().players : names.map((n, i) => makePlayer(n, i));
+      const players = mode === 'solo' ? soloTeam().players : names.map((n, i) => makePlayer(n, i, `p${i + 1}`));
       set({ room: null, roomStatus: null, me: null });
-      apply({ t: 'setup', scenario, difficulty, mode, players, design });
+      // roles chosen on the setup screen are by seat number (p1…p4)
+      apply({ t: 'setup', scenario, difficulty, mode, players, design, roles: mode === 'solo' ? undefined : roles });
     },
     begin: (scenario, difficulty, design) => get().start({ scenario, difficulty, mode: 'solo', names: ['You'], design }),
     host: ({ scenario, difficulty, name }) => {
@@ -234,7 +277,15 @@ export const useStudio = create<StudioState>((set, get) => {
       else if (phase === 'fly') set({ phase });
       else get().dispatch({ t: 'phase', phase });
     },
-    setDesk: (desk) => set({ desk }),
+    setDesk: (desk) => {
+      set({ desk });
+      const { team, teamOp } = get();
+      // one shared screen: whoever owns the desk now has the controls
+      if (desk && team.mode === 'hotseat' && team.roles[desk] !== team.active) teamOp({ t: 'active', player: team.roles[desk] });
+    },
+    toggleDesk: (r) => get().setDesk(get().desk === r ? null : r),
+    openSection: (id, open) => set((s) => ({ sections: { ...s.sections, [id]: open ?? !s.sections[id] } })),
+    toggleFold: (id) => set((s) => ({ folds: { ...s.folds, [id]: !s.folds[id] } })),
     edit: (role, change) => {
       const d = get().design;
       if (!d) return;
@@ -264,6 +315,10 @@ export const useStudio = create<StudioState>((set, get) => {
       commit(future[0], 'director', team.active, false);
     },
     fly: (seed) => get().dispatch({ t: 'fly', seed: seed ?? randomSeed() }),
+    act: (option) => {
+      const p = get().run?.pending;
+      if (p) get().dispatch({ t: 'decide', index: p.index, option });
+    },
     vote: (option, o = {}) => {
       const { run, team, me } = get();
       const p = run?.pending;
@@ -292,7 +347,7 @@ export const useStudio = create<StudioState>((set, get) => {
     },
     exit: () => {
       get().room?.close();
-      set({ phase: 'select', scenario: null, design: null, analysis: null, past: [], future: [], feed: [], run: null, report: null, reports: [], decided: {}, team: soloTeam(), room: null, roomStatus: null, me: null });
+      set({ phase: 'select', scenario: null, design: null, analysis: null, past: [], future: [], feed: [], run: null, desk: null, sections: {}, folds: {}, focus: null, report: null, reports: [], decided: {}, team: soloTeam(), room: null, roomStatus: null, me: null });
     },
   };
 });

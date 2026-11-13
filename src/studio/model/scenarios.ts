@@ -8,11 +8,13 @@ import type { LauncherId, OrbitTypeId, PlatformId, StationId } from './catalog';
 import type { StudioDesign } from './design';
 import type { InstrumentId } from './instruments';
 import type { RegionId } from './regions';
+import type { TestId } from './tests';
 import type { BodyId, ResourceId, ScenarioId } from './types';
 
 export type MetricId =
   | 'gsd' | 'revisit' | 'mapped' | 'latency' | 'lifetime' | 'capacity' | 'availability' | 'service'
-  | 'relayCoverage' | 'relayRate' | 'quiet' | 'marsMapped' | 'dataReturn' | 'launchMonth' | 'altitude';
+  | 'relayCoverage' | 'relayRate' | 'quiet' | 'marsMapped' | 'dataReturn' | 'launchMonth' | 'altitude'
+  | 'crewDose' | 'supplies' | 'moonDays' | 'downlink' | 'crewSize';
 
 export interface Requirement {
   id: string;
@@ -60,6 +62,10 @@ export interface Scenario {
   deadlineMonths: number;
   /** Operations team and facilities per year ($M). */
   opsPerYearM: number;
+  /** Crewed flights: mission control, training and the recovery fleet, per flight ($M). */
+  opsPerMissionM?: number;
+  /** People on board: the capsule's call sign. */
+  crew?: { callSign: string };
   /** Months from the project start when the launch windows open (Mars). */
   windows?: number[];
   startLabel: string;
@@ -90,7 +96,18 @@ const base = {
   propellantMarginPct: 10,
   trackHoursPerDay: 8,
   insurance: false,
+  tests: [] as TestId[],
 };
+/** Every mission starts with an empty assembly stand: no structure, no power, no radio, no rocket. */
+const empty = {
+  ...base,
+  launcher: 'none' as const, platform: 'none' as const, mount: 'deployed' as const, arrayM2: 0, batteryWh: 0,
+  computer: 'none' as const, adcs: 'none' as const, propulsion: 'none' as const, instruments: [] as InstrumentId[],
+  band: 'S' as const, antenna: 'none' as const, dishM: 0.5, txW: 2, storageGbit: 0, stations: [] as StationId[],
+  reservePct: 20,
+};
+/** The reference designs run the usual campaign. */
+const tested: TestId[] = ['vibration', 'tvac', 'deploy', 'compat', 'rehearsal'];
 const orbitDefaults = { altKm: 600, incDeg: 20, ltanH: 10.5, lonDeg: 23, transfer: 'direct' as const, capture: 'aerobrake' as const };
 
 // ------------------------------------------------------------------ tutorial
@@ -137,14 +154,11 @@ const TUTORIAL: Scenario = {
     orbit: { ...orbitDefaults, type: 'sso', altKm: 575, ltanH: 10.5 }, launcher: 'rideshare', plannedYears: 2,
     platform: 'cube12u', mount: 'deployed', arrayM2: 0.3, batteryWh: 60, computer: 'cots', adcs: 'wheels', propulsion: 'none',
     instruments: ['cubecam'], band: 'S', antenna: 'patch', dishM: 0.3, txW: 2, storageGbit: 32, stations: ['luanda'],
-    reservePct: 15,
+    reservePct: 15, tests: tested,
   },
   starter: {
-    ...base, scenario: 'tutorial', name: 'My first satellite', primary: 'firstLight',
-    orbit: { ...orbitDefaults, type: 'sso', altKm: 525, ltanH: 10.5 }, launcher: 'rideshare', plannedYears: 2,
-    platform: 'cube12u', mount: 'body', arrayM2: 0.1, batteryWh: 20, computer: 'cots', adcs: 'magnetorquer', propulsion: 'none',
-    instruments: [], band: 'UHF', antenna: 'patch', dishM: 0.3, txW: 1, storageGbit: 8, stations: ['luanda'],
-    reservePct: 10,
+    ...empty, scenario: 'tutorial', name: 'My first satellite', primary: 'firstLight',
+    orbit: { ...orbitDefaults, type: 'sso', altKm: 525, ltanH: 10.5 }, plannedYears: 2,
   },
 };
 
@@ -228,14 +242,11 @@ const ANGOLA_EO: Scenario = {
     orbit: { ...orbitDefaults, type: 'sso', altKm: 600, ltanH: 10.5 }, launcher: 'rideshare', plannedYears: 5,
     platform: 'micro', mount: 'deployed', arrayM2: 0.6, batteryWh: 120, computer: 'radTolerant', adcs: 'wheels', propulsion: 'none',
     instruments: ['msWide', 'ms10'], band: 'X', antenna: 'helix', dishM: 0.5, txW: 5, storageGbit: 128, stations: ['luanda', 'hartebeesthoek'],
-    reservePct: 20,
+    reservePct: 20, tests: tested,
   },
   starter: {
-    ...base, scenario: 'angola-eo', name: 'Angola EO satellite', primary: 'agri',
-    orbit: { ...orbitDefaults, type: 'sso', altKm: 600, ltanH: 10.5 }, launcher: 'rideshare', plannedYears: 5,
-    platform: 'micro', mount: 'deployed', arrayM2: 1, batteryWh: 100, computer: 'radTolerant', adcs: 'wheels', propulsion: 'none',
-    instruments: [], band: 'S', antenna: 'patch', dishM: 0.5, txW: 2, storageGbit: 32, stations: ['luanda'],
-    reservePct: 20,
+    ...empty, scenario: 'angola-eo', name: 'Angola EO satellite', primary: 'agri',
+    orbit: { ...orbitDefaults, type: 'sso', altKm: 600, ltanH: 10.5 }, plannedYears: 5,
   },
 };
 
@@ -285,7 +296,7 @@ const GEO_COMMS: Scenario = {
   instruments: ['cband', 'kuband', 'kaHts'],
   stations: ['luanda', 'hartebeesthoek'],
   budgetM: 420,
-  deadlineMonths: 48,
+  deadlineMonths: 52,
   opsPerYearM: 2.5,
   startLabel: 'January 2027',
   critical: ['power', 'mass', 'time'],
@@ -300,14 +311,11 @@ const GEO_COMMS: Scenario = {
     orbit: { ...orbitDefaults, type: 'geo', lonDeg: 23 }, launcher: 'falcon9', plannedYears: 15,
     platform: 'large', mount: 'tracking', arrayM2: 48, batteryWh: 13_500, computer: 'radHard', redundant: true, adcs: 'wheels', propulsion: 'biprop',
     instruments: ['kuband', 'cband'], band: 'S', antenna: 'helix', dishM: 1, txW: 10, storageGbit: 8, stations: ['luanda', 'hartebeesthoek'],
-    reservePct: 15, insurance: true,
+    reservePct: 15, insurance: true, tests: tested,
   },
   starter: {
-    ...base, scenario: 'geo-comms', name: 'Angola GEO satellite', primary: 'tv',
-    orbit: { ...orbitDefaults, type: 'geo', lonDeg: 23 }, launcher: 'falcon9', plannedYears: 15,
-    platform: 'large', mount: 'tracking', arrayM2: 30, batteryWh: 8_000, computer: 'radTolerant', adcs: 'wheels', propulsion: 'biprop',
-    instruments: [], band: 'S', antenna: 'helix', dishM: 1, txW: 10, storageGbit: 8, stations: ['luanda'],
-    reservePct: 15,
+    ...empty, scenario: 'geo-comms', name: 'Angola GEO satellite', primary: 'tv',
+    orbit: { ...orbitDefaults, type: 'geo', lonDeg: 23 }, plannedYears: 15,
   },
 };
 
@@ -370,14 +378,11 @@ const LUNAR_RELAY: Scenario = {
     orbit: { ...orbitDefaults, type: 'halo', transfer: 'direct' }, launcher: 'falcon9', plannedYears: 5,
     platform: 'micro', mount: 'tracking', arrayM2: 1.5, batteryWh: 300, computer: 'radTolerant', adcs: 'wheels', propulsion: 'mono',
     instruments: ['proxX'], band: 'X', antenna: 'dish', dishM: 0.8, txW: 20, storageGbit: 512, stations: ['deepCommercial'], trackHoursPerDay: 16,
-    reservePct: 20,
+    reservePct: 20, tests: tested,
   },
   starter: {
-    ...base, scenario: 'lunar-relay', name: 'Lunar relay', primary: 'landers',
-    orbit: { ...orbitDefaults, type: 'halo', transfer: 'direct' }, launcher: 'falcon9', plannedYears: 5,
-    platform: 'small', mount: 'deployed', arrayM2: 2, batteryWh: 300, computer: 'radTolerant', adcs: 'wheels', propulsion: 'mono',
-    instruments: [], band: 'X', antenna: 'patch', dishM: 1, txW: 10, storageGbit: 128, stations: ['deepCommercial'], trackHoursPerDay: 8,
-    reservePct: 20,
+    ...empty, scenario: 'lunar-relay', name: 'Lunar relay', primary: 'landers',
+    orbit: { ...orbitDefaults, type: 'halo', transfer: 'direct' }, plannedYears: 5,
   },
 };
 
@@ -453,14 +458,83 @@ const MARS_ORBITER: Scenario = {
     orbit: { ...orbitDefaults, type: 'marsLow', altKm: 300, ltanH: 15, capture: 'aerobrake' }, launcher: 'falcon9x', plannedYears: 2,
     platform: 'medium', mount: 'tracking', arrayM2: 12, batteryWh: 900, computer: 'radHard', redundant: true, adcs: 'wheels', propulsion: 'biprop',
     instruments: ['ctx', 'crism', 'mcs'], band: 'X', antenna: 'dish', dishM: 3, txW: 100, storageGbit: 2_048, stations: ['dsn'], trackHoursPerDay: 8,
-    reservePct: 25,
+    reservePct: 25, tests: tested,
   },
   starter: {
-    ...base, scenario: 'mars-orbiter', name: 'Mars orbiter', primary: 'minerals',
-    orbit: { ...orbitDefaults, type: 'marsLow', altKm: 300, ltanH: 15, capture: 'propulsive' }, launcher: 'falcon9x', plannedYears: 2,
-    platform: 'medium', mount: 'deployed', arrayM2: 8, batteryWh: 500, computer: 'radTolerant', adcs: 'wheels', propulsion: 'biprop',
-    instruments: [], band: 'X', antenna: 'dish', dishM: 2, txW: 50, storageGbit: 512, stations: ['dsn'], trackHoursPerDay: 8,
-    reservePct: 20,
+    ...empty, scenario: 'mars-orbiter', name: 'Mars orbiter', primary: 'minerals',
+    orbit: { ...orbitDefaults, type: 'marsLow', altKm: 300, ltanH: 15, capture: 'propulsive' }, plannedYears: 2,
+  },
+};
+
+// ------------------------------------------------------------------ crew around the Moon
+const CREW_MOON: Scenario = {
+  id: 'crew-moon',
+  name: 'Crew Around the Moon',
+  tagline: 'Fly astronauts around the Moon and bring every one of them home.',
+  customer: 'An Artemis Accords partnership (Angola signed in 2023)',
+  brief: 'In April 2026 Artemis II carried four people around the Moon, the first in more than fifty years. Your capsule, call sign Palanca after Angola\'s giant sable antelope, flies next. With people on board everything changes: air, water and food for every day, a shelter from solar storms, a way off a failing rocket and a heat shield for an 11 km/s return. The first requirement is not science. It is that the crew comes home.',
+  body: 'moon',
+  crew: { callSign: 'Palanca' },
+  requirements: [
+    { id: 'crew.dose', label: 'Radiation dose per astronaut, with one solar storm', metric: 'crewDose', threshold: 150, goal: 80, unit: 'mSv', better: 'lower', explain: 'NASA limits an astronaut\'s whole career to 600 mSv. A flight plans for one large solar storm and still stays far below that.' },
+    { id: 'crew.margin', label: 'Spare days of air, water and food', metric: 'supplies', threshold: 2, goal: 4, unit: 'days', better: 'higher', explain: 'A delay on the way home must not become an emergency: Apollo 13 lived on its margins.' },
+  ],
+  objectives: [
+    {
+      id: 'shakedown', name: 'Prove the ship',
+      explain: 'A test flight with people: check every system and fly the capsule by hand, as Artemis II did.',
+      value: { pilotKit: 1, radSensors: 0.6, crewCam: 0.3 },
+      requirements: [
+        { id: 'shakedown.crew', label: 'Astronauts on board', metric: 'crewSize', threshold: 3, goal: 4, unit: 'crew', better: 'higher', explain: 'A full crew tests every seat, every console and every procedure.' },
+      ],
+    },
+    {
+      id: 'moonSci', name: 'Science at the Moon',
+      explain: 'Stay in lunar orbit long enough to study the surface and what deep space does to the human body.',
+      value: { lunarCam: 1, bioLab: 0.6, radSensors: 0.5 },
+      requirements: [
+        { id: 'moonSci.days', label: 'Days at the Moon', metric: 'moonDays', threshold: 3, goal: 6, unit: 'days', better: 'higher', explain: 'A flyby is over in a day. Mapping landing sites and running experiments takes days in orbit.' },
+      ],
+    },
+    {
+      id: 'outreach', name: 'Bring the world along',
+      explain: 'Live video from the Moon to classrooms in Luanda and everywhere else.',
+      value: { o2o: 1, crewCam: 0.7 },
+      requirements: [
+        { id: 'outreach.rate', label: 'Downlink from the Moon', metric: 'downlink', threshold: 2, goal: 20, unit: 'Mbps', better: 'higher', explain: '2 Mbps carries ordinary video; 20 Mbps carries it live in 4K.' },
+      ],
+    },
+  ],
+  maxSecondary: 1,
+  orbitTypes: ['freeReturn', 'crewDro', 'crewNrho', 'crewLlo'],
+  launchers: ['sls', 'falconHeavy'],
+  platforms: ['capsule3', 'capsule4', 'capsuleHab'],
+  instruments: ['pilotKit', 'radSensors', 'crewCam', 'o2o', 'bioLab', 'lunarCam'],
+  stations: ['dsn', 'deepCommercial'],
+  budgetM: 5_600,
+  deadlineMonths: 66,
+  opsPerYearM: 0,
+  opsPerMissionM: 260,
+  startLabel: 'January 2027',
+  critical: ['mass', 'time', 'budget'],
+  lessons: [
+    'People need about 7 kg of air, water and food each a day, and somewhere to live: a crewed ship is mostly life support.',
+    'Stopping at the Moon costs propellant twice, to arrive and to leave. A flyby is nearly free and comes home by itself.',
+    'Beyond Earth\'s magnetic field the crew is exposed to radiation every day, and a solar storm can deliver months of it in hours.',
+    'Human rating means surviving any single failure: a spare computer, an escape system, tested life support.',
+  ],
+  example: {
+    ...base, scenario: 'crew-moon', name: 'Palanca (example)', primary: 'shakedown', secondary: ['outreach'],
+    orbit: { ...orbitDefaults, type: 'freeReturn' }, launcher: 'sls', plannedYears: 10 / 365.25,
+    platform: 'capsule4', mount: 'tracking', arrayM2: 29, batteryWh: 7_000, computer: 'radHard', redundant: true, adcs: 'wheels', propulsion: 'biprop',
+    instruments: ['pilotKit', 'radSensors', 'o2o'], band: 'S', antenna: 'dish', dishM: 1, txW: 20, storageGbit: 512, stations: ['dsn'], trackHoursPerDay: 24,
+    reservePct: 15, tests: [...tested, 'abort', 'eclss'],
+    crew: { size: 4, eclss: 'regen', marginDays: 4, shelter: 'stowage', suits: 'iva', abort: 'tower', shield: 'lunar' },
+  },
+  starter: {
+    ...empty, scenario: 'crew-moon', name: 'Palanca', primary: 'shakedown',
+    orbit: { ...orbitDefaults, type: 'freeReturn' }, plannedYears: 10 / 365.25, trackHoursPerDay: 12,
+    crew: { size: 2, eclss: 'open', marginDays: 0, shelter: 'none', suits: 'iva', abort: 'none', shield: 'leo' },
   },
 };
 
@@ -470,6 +544,7 @@ export const SCENARIOS: Record<ScenarioId, Scenario> = {
   'geo-comms': GEO_COMMS,
   'lunar-relay': LUNAR_RELAY,
   'mars-orbiter': MARS_ORBITER,
+  'crew-moon': CREW_MOON,
 };
 
 /** Every requirement that applies to a design: the mission's, then the chosen objectives'. */

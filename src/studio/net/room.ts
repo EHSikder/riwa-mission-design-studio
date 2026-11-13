@@ -6,6 +6,13 @@
  */
 export type RoomStatus = 'connecting' | 'open' | 'retrying' | 'lost';
 
+/**
+ * Where the room server is. Empty: the same site that serves the game (Render, or `npm run lan`). A static copy
+ * (Vercel) can point at the Render one with VITE_ROOMS_URL=https://….onrender.com at build time.
+ */
+export const ROOMS_URL = String(import.meta.env.VITE_ROOMS_URL ?? '').replace(/\/+$/, '');
+const api = (path: string) => `${ROOMS_URL}${path}`;
+
 export interface RoomLink {
   code: string;
   send: (op: object) => void;
@@ -31,7 +38,7 @@ export function joinRoom(code: string, onOp: (op: unknown, seq: number) => void,
   let closed = false;
   let es: EventSource | null = null;
   // a free host sleeps after minutes without a request, and sleeping empties its rooms: keep asking while in one
-  const keepAwake = setInterval(() => { fetch('/api/info').catch(() => {}); }, 5 * 60_000);
+  const keepAwake = setInterval(() => { fetch(api('/api/info')).catch(() => {}); }, 5 * 60_000);
   const stop = () => {
     closed = true;
     clearInterval(keepAwake);
@@ -40,7 +47,7 @@ export function joinRoom(code: string, onOp: (op: unknown, seq: number) => void,
   const open = () => {
     if (closed) return;
     onStatus('connecting');
-    es = new EventSource(`/api/room/${code}/events?from=${last}`);
+    es = new EventSource(api(`/api/room/${code}/events?from=${last}`));
     es.onopen = () => onStatus('open');
     es.addEventListener('hello', (e) => {
       const { length } = JSON.parse((e as MessageEvent<string>).data) as { length: number };
@@ -67,7 +74,7 @@ export function joinRoom(code: string, onOp: (op: unknown, seq: number) => void,
     code,
     send: (op) => {
       if (closed) return;
-      fetch(`/api/room/${code}/op`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(op) })
+      fetch(api(`/api/room/${code}/op`), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(op) })
         .catch(() => onStatus('retrying'));
     },
     close: stop,
@@ -77,7 +84,8 @@ export function joinRoom(code: string, onOp: (op: unknown, seq: number) => void,
 /** Whether this copy of the game has the room server behind it. A static host has not. */
 export async function roomsAvailable(): Promise<boolean> {
   try {
-    const r = await fetch('/api/info');
+    // a free Render server asleep takes up to a minute to wake: wait for it
+    const r = await fetch(api('/api/info'), { signal: AbortSignal.timeout(ROOMS_URL ? 70_000 : 8_000) });
     return r.ok && (r.headers.get('content-type') ?? '').includes('application/json');
   } catch {
     return false;
@@ -87,7 +95,7 @@ export async function roomsAvailable(): Promise<boolean> {
 /** This computer's LAN addresses, so the host can show teammates where to connect. */
 export async function lanAddresses(): Promise<string[]> {
   try {
-    const r = await fetch('/api/info');
+    const r = await fetch(api('/api/info'));
     return r.ok ? ((await r.json()) as { addresses: string[] }).addresses : [];
   } catch {
     return [];
@@ -96,7 +104,7 @@ export async function lanAddresses(): Promise<string[]> {
 
 export async function listRooms(): Promise<RoomSummary[]> {
   try {
-    const r = await fetch('/api/rooms');
+    const r = await fetch(api('/api/rooms'));
     return r.ok ? ((await r.json()) as RoomSummary[]) : [];
   } catch {
     return [];

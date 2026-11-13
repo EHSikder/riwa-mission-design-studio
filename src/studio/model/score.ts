@@ -42,6 +42,8 @@ export interface Report {
   tryNext: string[];
   /** Collaboration score from the team game (0–1), when played as a team. */
   teamwork?: number;
+  /** The people on board, and how they fared (crewed missions). */
+  crew?: { callSign: string; size: number; alive: boolean; doseMsv: number; moonDays: number; days: number };
 }
 
 // Platinum needs goal-level requirements: thresholds alone top out near 900
@@ -76,6 +78,11 @@ export function evaluate(run: MissionRun, opts: { assisted?: boolean; teamwork?:
     else if (m === 'dataReturn') v = r.value * Math.max(0, dataShare);
     else if (m === 'capacity') v = r.value * h * ((st as { leased?: boolean }).leased ? 0.85 : 1);
     else if (m === 'relayRate') v = r.value * h;
+    else if (m === 'crewDose') v = st.crew ? st.crew.doseMsv : r.value;
+    else if (m === 'supplies') v = st.crew ? Math.max(0, st.crew.supplyDays) : 0;
+    else if (m === 'moonDays') v = st.crew?.moonDays ?? 0;
+    else if (m === 'downlink') v = r.value * st.linkFactor;
+    else if (m === 'crewSize') v = st.crew?.alive ? r.value : 0;
     const ok = (x: number, y: number) => (r.req.better === 'lower' ? x <= y : x >= y);
     const met: FlownRequirement['met'] = Number.isNaN(v) ? 'fail' : ok(v, r.req.goal) ? 'goal' : ok(v, r.req.threshold) ? 'threshold' : 'fail';
     // aiming for the goal pays if you make it, and costs if you fall short
@@ -91,7 +98,9 @@ export function evaluate(run: MissionRun, opts: { assisted?: boolean; teamwork?:
   });
   const weight = (r: FlownRequirement) => (!r.objective ? 1 : r.objective.id === d.primary ? 1 : 0.5);
   const wSum = requirements.reduce((acc, r) => acc + weight(r), 0);
-  const success = operated ? (400 * requirements.reduce((acc, r) => acc + weight(r) * r.credit, 0)) / Math.max(1e-9, wSum) : 0;
+  // a crew that does not come home is the whole result
+  const crewLost = !!st.crew && !st.crew.alive;
+  const success = operated && !crewLost ? (400 * requirements.reduce((acc, r) => acc + weight(r) * r.credit, 0)) / Math.max(1e-9, wSum) : 0;
 
   // ---------------------------------------------------------------- value delivered
   const objectives = Object.keys(a.value).map((id) => ({
@@ -102,7 +111,7 @@ export function evaluate(run: MissionRun, opts: { assisted?: boolean; teamwork?:
   }));
   const vp = objectives.find((o) => o.id === d.primary)?.achieved ?? 0;
   const vs = objectives.filter((o) => o.id !== d.primary).reduce((acc, o) => acc + o.achieved, 0);
-  const value = 300 * Math.min(1, vp + 0.35 * vs);
+  const value = crewLost ? 0 : 300 * Math.min(1, vp + 0.35 * vs);
 
   // ---------------------------------------------------------------- efficiency
   const budgetM = a.cost.budgetM;
@@ -121,8 +130,8 @@ export function evaluate(run: MissionRun, opts: { assisted?: boolean; teamwork?:
     { name: `Data lost ${f1(lostShare * 100)}%`, value: 30 * (1 - lostShare) },
   ];
   // money is only well spent if the mission flew: a lost or shortened mission keeps part of these points
-  const flownShare = Math.min(1, flownYears / Math.max(0.25, d.plannedYears));
-  const efficiency = efficiencyParts.reduce((acc, l) => acc + l.value, 0) * (0.4 + 0.6 * flownShare);
+  const flownShare = a.crew ? Math.min(1, Math.max(0, st.day) / a.crew.days) : Math.min(1, flownYears / Math.max(0.25, d.plannedYears));
+  const efficiency = efficiencyParts.reduce((acc, l) => acc + l.value, 0) * (0.4 + 0.6 * flownShare) * (crewLost ? 0.2 : 1);
 
   // ---------------------------------------------------------------- decisions (and teamwork, in the team game)
   const judged = run.events.filter((e) => e.quality !== undefined);
@@ -132,7 +141,9 @@ export function evaluate(run: MissionRun, opts: { assisted?: boolean; teamwork?:
 
   const total = Math.round(success + value + efficiency + decisionsPts);
   const failed = requirements.filter((r) => r.met === 'fail');
-  const outcome = !operated
+  const outcome = crewLost
+    ? 'Crew lost'
+    : !operated
     ? 'Mission lost'
     : st.endReason !== 'Mission complete'
       ? `Ended early (${st.endReason})`
@@ -150,7 +161,7 @@ export function evaluate(run: MissionRun, opts: { assisted?: boolean; teamwork?:
   if (leftM > 0 && Number.isFinite(budgetM)) worked.push(`The mission finished $${f1(leftM)}M under budget.`);
   if (st.endReason && st.endReason !== 'Mission complete') {
     const ev = [...run.events].reverse().find((e) => e.kind === 'failure');
-    limited.push(`The mission ended ${operated ? `after ${f1(flownYears)} years` : 'before it could operate'}: ${st.endReason.toLowerCase()}. ${ev?.lesson ?? ''}`);
+    limited.push(`The mission ended ${operated ? (a.crew ? `on flight day ${Math.max(1, Math.round(st.day))}` : `after ${f1(flownYears)} years`) : 'before it could operate'}: ${st.endReason.toLowerCase()}. ${ev?.lesson ?? ''}`);
     if (/computer/i.test(st.endReason)) tryNext.push(d.redundant ? 'A radiation-hardened computer fails far less often.' : 'Carry a spare computer (Expert) or a more reliable one: one failure ended everything.');
     if (/decay/i.test(st.endReason)) tryNext.push('Fly higher, or add propulsion to hold the altitude against drag.');
     if (/launch/i.test(st.endReason)) tryNext.push(d.insurance ? 'Insurance got money back; a more reliable rocket lowers the odds.' : 'Insure the launch, or choose a rocket with a better record.');
@@ -195,5 +206,6 @@ export function evaluate(run: MissionRun, opts: { assisted?: boolean; teamwork?:
     limited: uniq(limited).slice(0, 5),
     tryNext: uniq(tryNext).slice(0, 4),
     teamwork: opts.teamwork,
+    crew: st.crew && a.crew ? { callSign: a.crew.callSign, size: a.crew.size, alive: st.crew.alive, doseMsv: st.crew.doseMsv, moonDays: st.crew.moonDays, days: Math.max(0, Math.round(st.day)) } : undefined,
   };
 }

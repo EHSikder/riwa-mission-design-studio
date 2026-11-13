@@ -5,6 +5,7 @@
  * coefficient), the radiation dose, the distance to Earth for the radio link, and the Δv to get there and stay.
  */
 import { ORBIT_TYPES, type LaunchTarget, type OrbitTypeId } from './catalog';
+import { CREW_TRIPS } from './crew';
 import type { OrbitChoice } from './design';
 import { BODIES, DEG, G0, YEAR, type Body } from './types';
 
@@ -234,6 +235,23 @@ export function orbitFacts(o: OrbitChoice): OrbitFacts {
       eclipseFrac: 0, eclipseMin: 0, eclipsesPerYear: 0,
       betaMinDeg: 0, betaRangeDeg: [0, 30],
       earthRangeM: [4.45e8, 4.8e8], transferDays: o.transfer === 'lowEnergy' ? LUNAR_DV.halo.lowEnergyDays! : LUNAR_DV.halo.days, radKradPerYear: 2,
+    };
+  }
+  if (o.type === 'freeReturn' || o.type === 'crewDro' || o.type === 'crewNrho' || o.type === 'crewLlo') {
+    // a crewed trip: the whole flight is the mission, counted in days; only the low orbit passes through shadow
+    const trip = CREW_TRIPS[o.type];
+    const low = o.type === 'crewLlo';
+    const r = body.radius + 100_000;
+    const period = circularPeriodS(body, r);
+    const f = low ? eclipseFraction(body, 100, 0) : 0;
+    return {
+      ...base,
+      altKm: trip.closestKm, apoKm: trip.closestKm, incDeg: low ? 90 : 0, periodMin: low ? period / 60 : trip.days * 1440,
+      speedKms: low ? Math.sqrt(body.mu / r) / 1000 : 1,
+      imagingAltKm: trip.closestKm, imagingShare: trip.moonDays / trip.days,
+      eclipseFrac: f, eclipseMin: (f * period) / 60, eclipsesPerYear: low ? ((trip.moonDays * 86_400) / period) / (trip.days / 365.25) : 0,
+      betaMinDeg: 0, betaRangeDeg: [0, 30],
+      earthRangeM: [3.9e8, 4.4e8], transferDays: 0, radKradPerYear: 2,
     };
   }
   // marsHigh: 1-sol ellipse, low point o.altKm

@@ -68,7 +68,7 @@ export function ReportScreen() {
         <div>
           <div className="st-kicker">Mission report · {r.scenario} · {DIFFICULTY[r.difficulty as keyof typeof DIFFICULTY].name}</div>
           <h2>{r.name}</h2>
-          <p className="st-outcome">{r.outcome}{r.flownYears > 0 ? ` · ${r.flownYears.toFixed(1)} years of operations` : ''}</p>
+          <p className="st-outcome">{r.outcome}{r.crew ? ` · ${r.crew.days}-day flight · ${r.crew.alive ? 'everyone came home' : 'the crew was lost'}` : r.flownYears > 0 ? ` · ${r.flownYears.toFixed(1)} years of operations` : ''}</p>
         </div>
         <div className="st-score">
           <b>{r.score.total}</b>
@@ -88,6 +88,16 @@ export function ReportScreen() {
       </div>
 
       <div className="st-report-grid">
+        {r.crew && (
+          <section className="st-card-panel wide">
+            <h3>The crew of {r.crew.callSign}</h3>
+            <div className="st-facts">
+              <div><span>Astronauts</span><b>{r.crew.size}, {r.crew.alive ? 'all home safe' : 'lost'}</b></div>
+              <div><span>Radiation per astronaut</span><b>{r.crew.doseMsv.toFixed(0)} mSv (career limit 600)</b></div>
+              <div><span>Days at the Moon</span><b>{r.crew.moonDays}</b></div>
+            </div>
+          </section>
+        )}
         <section className="st-card-panel">
           <h3>Score</h3>
           {PARTS.map((p) => {
@@ -168,7 +178,7 @@ export function ReportScreen() {
 
         <section className="st-card-panel">
           <h3>Mission log</h3>
-          <div className="st-report-log"><Timeline events={run.events} /></div>
+          <div className="st-report-log"><Timeline events={run.events} crew={!!r.crew} /></div>
         </section>
 
         {reports.length > 1 && (

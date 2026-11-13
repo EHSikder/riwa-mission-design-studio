@@ -15,11 +15,11 @@ export interface Sourced {
   estimate: boolean;
 }
 
-export type Difficulty = 'cadet' | 'engineer' | 'expert' | 'sandbox';
+export type Difficulty = 'guided' | 'cadet' | 'engineer' | 'expert' | 'sandbox';
 export type RoleId = 'director' | 'spacecraft' | 'science' | 'comms' | 'resources';
 export type ResourceId = 'mass' | 'power' | 'budget' | 'data' | 'comms' | 'time';
 export type BodyId = 'earth' | 'moon' | 'mars';
-export type ScenarioId = 'tutorial' | 'angola-eo' | 'geo-comms' | 'lunar-relay' | 'mars-orbiter';
+export type ScenarioId = 'tutorial' | 'angola-eo' | 'geo-comms' | 'lunar-relay' | 'mars-orbiter' | 'crew-moon';
 
 export const ROLES: Record<RoleId, { name: string; short: string; desk: string; explain: string }> = {
   director: {

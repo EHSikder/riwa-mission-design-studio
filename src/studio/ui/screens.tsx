@@ -12,9 +12,10 @@ import { StatusBadge, fmt } from './controls';
 import { IssueList, ResourceIcon } from './Dashboard';
 import { ObjectivesPicker, RequirementsTable } from './desks';
 import { GoPoll, TeamPicker, type PlayMode } from './team';
-import { canEdit, ownerOf } from '../model/team';
+import { Brand } from './Brand';
+import { canEdit, defaultRoles, makePlayer, ownerOf } from '../model/team';
 
-const ORDER: ScenarioId[] = ['tutorial', 'angola-eo', 'geo-comms', 'lunar-relay', 'mars-orbiter'];
+const ORDER: ScenarioId[] = ['tutorial', 'angola-eo', 'geo-comms', 'lunar-relay', 'mars-orbiter', 'crew-moon'];
 
 type Step = 'mission' | 'difficulty' | 'players' | 'join';
 const STEPS: { id: Step; label: string }[] = [
@@ -34,6 +35,10 @@ export function MissionSelect() {
   const [difficulty, setDifficulty] = useState<Difficulty>('engineer');
   const [mode, setMode] = useState<PlayMode>('solo');
   const [names, setNames] = useState<string[]>(['', '']);
+  // who holds which role, by seat (p1…p4): shared out by default, changed with a click
+  const [roles, setRoles] = useState<Record<RoleId, string> | null>(null);
+  const seats = names.map((n, i) => makePlayer(n || `Player ${i + 1}`, i, `p${i + 1}`));
+  const shared = roles && Object.values(roles).every((id) => seats.some((p) => p.id === id)) ? roles : defaultRoles(seats);
   const [code, setCode] = useState(linked);
   // a copy on a static host has no room server: network rooms are off there
   const [rooms, setRooms] = useState<boolean | null>(null);
@@ -59,13 +64,13 @@ export function MissionSelect() {
     const named = names.map((n, i) => n.trim() || `Player ${i + 1}`);
     if (step === 'join') join(code, named[0]);
     else if (mode === 'solo') start({ scenario, difficulty, mode: 'solo', names: ['You'] });
-    else if (mode === 'hotseat') start({ scenario, difficulty, mode: 'hotseat', names: named });
+    else if (mode === 'hotseat') start({ scenario, difficulty, mode: 'hotseat', names: named, roles: shared });
     else host({ scenario, difficulty, name: named[0] });
   };
   return (
     <div className="st-setup" onKeyDown={(e) => { if (e.key === 'Escape' && back) setStep(back); }}>
       <header className="st-setup-head">
-        <div className="st-brand"><b>Space Underdogs</b><span>Mission design game</span></div>
+        <Brand />
         {step !== 'join' && (
           <ol className="st-setup-steps" aria-label="Setting up the game">
             {STEPS.map((s, k) => (
@@ -83,11 +88,12 @@ export function MissionSelect() {
         {step === 'mission' && (
           <>
             <p className="st-small-note">This game is at its best on a laptop or desktop. It works on a phone, with more scrolling.</p>
-            <div className="st-kicker">NASA Space Apps 2026 · Space Mission Design Game</div>
+            <div className="st-kicker">NASA Space Apps 2026 · Space Mission Design Game · team Space Underdogs</div>
             <h1>Choose your <em>mission</em>.</h1>
             <p className="st-lead">
-              Decide what it is for, design the spacecraft, choose the orbit and the rocket, and keep six resources in balance: mass,
-              power, money, data, communications and time. Then fly it, and find out what happened, and why.
+              Start from an empty assembly stand. Build the spacecraft part by part, pick the orbit and the rocket, keep six resources
+              in balance (mass, power, money, data, communications and time), test it, launch it, and fly it through whatever space
+              throws at it. Then find out what happened, and why.
             </p>
             <div className="st-scen-grid" role="radiogroup" aria-label="Mission">
               {ORDER.map((id) => {
@@ -99,14 +105,30 @@ export function MissionSelect() {
                     role="radio"
                     aria-checked={scenario === id}
                     autoFocus={scenario === id}
-                    className={`st-scen ${scenario === id ? 'on' : ''} body-${s.tutorial ? 'tutorial' : s.body}`}
+                    className={`st-scen ${scenario === id ? 'on' : ''} body-${s.tutorial ? 'tutorial' : s.crew ? 'crew' : s.body}`}
                     onClick={() => pickScenario(id)}
                     onDoubleClick={() => setStep('difficulty')}
                   >
-                    <span className="st-scen-art" aria-hidden />
+                    <span className="st-scen-art" aria-hidden>
+                      {s.crew && (
+                        <svg viewBox="0 0 64 64" width="64" height="64">
+                          <rect x="2" y="45" width="17" height="8" rx="1" fill="#132a6b" stroke="#8796b8" strokeWidth="0.8" />
+                          <rect x="45" y="45" width="17" height="8" rx="1" fill="#132a6b" stroke="#8796b8" strokeWidth="0.8" />
+                          <path d="M7 45v8M12 45v8M50 45v8M55 45v8" stroke="#8796b8" strokeWidth="0.6" />
+                          <rect x="20" y="40" width="24" height="20" rx="2" fill="#c9d0da" />
+                          <path d="M28 60l-3 4h14l-3-4z" fill="#9aa3ad" />
+                          <rect x="19" y="37.5" width="26" height="3" fill="#3a3836" />
+                          <path d="M20 37.5 27 16h10l7 21.5z" fill="#e9edf2" />
+                          <path d="M27.5 27h3v3h-3zM33.5 27h3v3h-3z" fill="#05070c" />
+                          <rect x="28.5" y="13" width="7" height="3" fill="#1d2027" />
+                          <path d="M32 13V4" stroke="#e9edf2" strokeWidth="1.6" />
+                          <path d="M29.5 5 32 0l2.5 5z" fill="#e9edf2" />
+                        </svg>
+                      )}
+                    </span>
                     <span className="st-scen-name">{s.name}</span>
                     <span className="st-scen-tag">{s.tagline}</span>
-                    <span className="st-scen-meta">{s.tutorial ? 'Tutorial · 10 minutes' : `${fmt.m(s.budgetM)} · launch within ${s.deadlineMonths} months`}</span>
+                    <span className="st-scen-meta">{s.tutorial ? 'Tutorial · 10 minutes' : `${fmt.m(s.budgetM)} · launch within ${s.deadlineMonths} months`}{s.crew ? ' · astronauts on board' : ''}</span>
                     <span className="st-scen-crit">
                       {s.critical.map((r: ResourceId) => <span key={r}><ResourceIcon id={r} /> {RESOURCES[r].name}</span>)}
                     </span>
@@ -125,12 +147,12 @@ export function MissionSelect() {
           <>
             <div className="st-kicker">{sc.name}</div>
             <h1>How <em>hard</em>?</h1>
-            <p className="st-lead">{sc.tutorial ? 'The tutorial is played on Cadet, with a coach for every step.' : 'The same mission, with more or less money, time and luck.'}</p>
-            <div className="st-diff-row" role="radiogroup" aria-label="Difficulty">
+            <p className="st-lead">{sc.tutorial ? 'The tutorial is played with a guide for every step.' : 'The same mission, with more or less money, time, luck and help. New to space? Pick Guided: a mission guide shows where to click and suggests a choice that works.'}</p>
+            <div className="st-diff-row five" role="radiogroup" aria-label="Difficulty">
               {(Object.keys(DIFFICULTY) as Difficulty[]).map((k) => {
                 const budget = sc.budgetM * DIFFICULTY[k].budget;
                 return (
-                  <button key={k} type="button" role="radio" aria-checked={difficulty === k} autoFocus={difficulty === k} className={difficulty === k ? 'on' : ''} disabled={!!sc.tutorial && k !== 'cadet'} onClick={() => setDifficulty(k)} onDoubleClick={() => setStep('players')}>
+                  <button key={k} type="button" role="radio" aria-checked={difficulty === k} autoFocus={difficulty === k} className={difficulty === k ? 'on' : ''} disabled={!!sc.tutorial && k !== 'cadet' && k !== 'guided'} onClick={() => setDifficulty(k)} onDoubleClick={() => setStep('players')}>
                     <b>{DIFFICULTY[k].name}</b>
                     <span>{DIFFICULTY[k].explain}</span>
                     <em>Budget {Number.isFinite(budget) ? fmt.m(budget) : 'unlimited'} · {DIFFICULTY[k].events ? 'surprises in flight' : 'no random failures'}</em>
@@ -145,7 +167,7 @@ export function MissionSelect() {
           <>
             <div className="st-kicker">{sc.name} · {DIFFICULTY[difficulty].name}</div>
             <h1>Who is <em>flying</em>?</h1>
-            <TeamPicker mode={mode} setMode={setMode} names={names} setNames={setNames} rooms={rooms} />
+            <TeamPicker mode={mode} setMode={setMode} names={names} setNames={setNames} rooms={rooms} roles={shared} setRoles={setRoles} seats={seats} />
           </>
         )}
 
@@ -211,12 +233,18 @@ export function Brief() {
           <RequirementsTable a={a} edit={(c) => edit('director', c)} hidePrediction />
         </fieldset>
         <div className="st-brief-go">
-          <button type="button" className="st-primary big" onClick={() => setPhase('design')}>Start designing →</button>
+          <button type="button" className="st-primary big" data-guide="go-design-main" onClick={() => setPhase('design')}>Start designing →</button>
         </div>
       </div>
       <aside className="st-brief-side">
         <h3>What this mission teaches</h3>
         <ul>{s.lessons.map((l) => <li key={l}>{l}</li>)}</ul>
+        <h3>How real teams do it</h3>
+        <ul>
+          <li><b>Concurrent design.</b> NASA JPL's Team X and ESA's Concurrent Design Facility put every subsystem engineer in one room, each at a station, all changing one shared model. Your desks are those stations.</li>
+          <li><b>Phases and reviews.</b> NASA's projects go concept (Phase A), preliminary design (B), final design (C), build and test (D), then operations (E), with a review board at each gate. Here: Brief, Design, Review, Build and fly.</li>
+          <li><b>Test as you fly.</b> A flaw found on the ground costs weeks; in orbit it can cost the mission. Kepler, Galileo and InSight all had to engineer around problems that tests or luck did not catch.</li>
+        </ul>
         <h3>The team</h3>
         <ul className="st-roles">
           {(Object.keys(ROLES) as RoleId[]).map((r) => (
@@ -242,6 +270,7 @@ export function Review() {
   const setPhase = useStudio((s) => s.setPhase);
   const solo = useStudio((s) => s.team.mode === 'solo');
   const fails = a.issues.filter((i) => i.level === 'fail');
+  const missing = a.build.filter((b) => !b.done && !b.optional);
   const go = fails.length === 0;
   return (
     <div className="st-review">
@@ -280,11 +309,11 @@ export function Review() {
       {solo ? (
         <div className={`st-verdict ${go ? 'go' : 'nogo'}`}>
           <div>
-            <b>{go ? 'GO for launch' : 'NO-GO'}</b>
-            <span>{go ? 'No blocking problems. Every warning is a risk you choose to accept.' : `${fails.length} blocking problem${fails.length > 1 ? 's' : ''}. You can still fly, and learn from what goes wrong.`}</span>
+            <b>{go ? 'GO to build' : 'NO-GO'}</b>
+            <span>{go ? 'No blocking problems. Next: build it, run your tests, launch. Every warning is a risk you choose to accept.' : missing.length ? `${fails.length} blocking problem${fails.length > 1 ? 's' : ''}, and ${missing.map((b) => b.label.toLowerCase()).join(', ')} still missing: a spacecraft with a part missing is not allowed on the rocket.` : `${fails.length} blocking problem${fails.length > 1 ? 's' : ''}. You can still build and fly it, and learn from what goes wrong.`}</span>
           </div>
           <button type="button" className="st-ghost" onClick={() => setPhase('design')}>Back to the desks</button>
-          <button type="button" className={go ? 'st-primary' : undefined} onClick={() => setPhase('fly')}>{go ? 'Launch the mission' : 'Fly anyway'}</button>
+          <button type="button" className={go ? 'st-primary' : undefined} data-guide="go-fly-main" data-sfx="go" onClick={() => setPhase('fly')}>{go ? 'Build and fly →' : 'Build and fly anyway'}</button>
         </div>
       ) : (
         <GoPoll a={a} />

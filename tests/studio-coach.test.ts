@@ -11,6 +11,7 @@ import { SCENARIOS } from '../src/studio/model/scenarios';
 
 /** What the "Size it for me" buttons do. */
 function sizeArrays(d: StudioDesign) {
+  if (d.arrayM2 <= 0) d.arrayM2 = 0.05; // from an empty stand: start with the smallest array
   const a = analyze(d, 'cadet');
   const perM2 = a.power.bolW / d.arrayM2;
   const ageing = a.power.eolW / a.power.bolW;
@@ -26,11 +27,16 @@ describe('the coach', () => {
     const seen: string[] = [];
     const doIt: Record<string, () => void> = {
       brief: () => { phase = 'design'; },
+      structure: () => { d.platform = 'cube12u'; },
+      brain: () => { d.computer = 'cots'; },
       camera: () => { d.instruments = ['cubecam']; },
       pointing: () => { d.adcs = 'wheels'; },
+      radio: () => { d.antenna = 'patch'; d.storageGbit = 32; d.band = 'S'; },
+      station: () => { d.stations = ['luanda']; },
       power: () => { d.mount = 'deployed'; sizeArrays(d); },
       battery: () => sizeBattery(d),
-      downlink: () => { d.band = 'S'; },
+      rocket: () => { d.launcher = 'rideshare'; },
+      tests: () => { d.tests = ['vibration', 'tvac', 'deploy', 'compat', 'rehearsal']; },
       green: () => { phase = 'review'; },
       launch: () => { phase = 'fly'; },
       fly: () => { phase = 'report'; },
@@ -43,14 +49,14 @@ describe('the coach', () => {
       doIt[id]();
       expect(step(), `step ${id} did not complete`).not.toBe(id);
     }
-    expect(seen).toEqual(['brief', 'camera', 'pointing', 'power', 'battery', 'downlink', 'green', 'launch', 'fly', 'report']);
+    expect(seen).toEqual(['brief', 'structure', 'brain', 'camera', 'pointing', 'radio', 'station', 'power', 'battery', 'rocket', 'tests', 'green', 'launch', 'fly', 'report']);
   });
 
   it('a Cadet player on a real mission is pointed at the right desks, and the example design clears them', () => {
     const s = SCENARIOS['angola-eo'];
     const start = currentStep(analyze(s.starter, 'cadet'), 'design');
-    expect(start.step.id).toBe('payload');
-    expect(start.step.desk).toBe('science');
+    expect(start.step.id).toBe('structure');
+    expect(start.step.desk).toBe('spacecraft');
     expect(currentStep(analyze(s.example, 'cadet'), 'design').step.id).toBe('review');
   });
 

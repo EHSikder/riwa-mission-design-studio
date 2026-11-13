@@ -31,7 +31,14 @@ describe('the team', () => {
     t = teamReduce(t, { t: 'join', player: { id: 'a', name: 'Ana', color: '' } });
     t = teamReduce(t, { t: 'join', player: { id: 'b', name: 'Ben', color: '' } });
     expect(t.players.map((p) => p.color)).toEqual(PLAYER_COLORS.slice(0, 2));
+    // the roles are shared out as players arrive, until someone picks by hand
+    expect(t.roles).toEqual(defaultRoles(t.players));
+    expect(t.roles.science).toBe('b');
+    t = teamReduce(t, { t: 'claim', role: 'science', player: 'a' });
     expect(t.roles.science).toBe('a');
+    t = teamReduce(t, { t: 'join', player: { id: 'c', name: 'Cleo', color: '' } });
+    expect(t.roles.science).toBe('a');
+    expect(Object.values(t.roles)).not.toContain('c');
     t = teamReduce(t, { t: 'claim', role: 'science', player: 'b' });
     expect(t.roles.science).toBe('b');
     expect(canEdit({ ...t, active: 'a' }, 'science')).toBe(false);

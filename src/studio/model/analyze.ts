@@ -16,6 +16,7 @@ import {
   pcduCostM, pcduKg, storageCostM, storageKg, storageW, transmitterCostM, transmitterKg, type LauncherId, type StationId,
 } from './catalog';
 import { computeAccess, earthMarsGeometry, geoService, lunarRelayGeometry, reachAngle, type AccessResult, type LunarRelayGeometry } from './access';
+import { ABORTS, CREW_KG, CREW_POWER_W, CREW_TRIPS, ECLSS, EVA_SUITS, GCR_MSV_PER_DAY, SEAT_AND_SUIT_KG, SHELTERS, SHIELDS, habNeedM3, type CrewOrbitId, type CrewPlan } from './crew';
 import { DIFFICULTY, type Level, type StudioDesign } from './design';
 import { INSTRUMENTS, groundSpeed, imagerAt, instrumentRateMbps, massGrowth, type Instrument, type InstrumentId } from './instruments';
 import { availabilityPct, beamwidthDeg, dishGainDbi, linkRate, type LinkEnds } from './link';
@@ -25,6 +26,7 @@ import {
 } from './orbit';
 import { LUNAR_SITES, REGIONS, regionArea, type RegionId } from './regions';
 import { SCENARIOS, activeRequirements, type Objective, type Requirement, type Scenario } from './scenarios';
+import { TESTS, applicableTests, type TestId } from './tests';
 import { DEG, RESOURCES, type Difficulty, type ResourceId, type RoleId } from './types';
 
 export type Status = 'good' | 'warn' | 'fail' | 'over';
@@ -57,6 +59,35 @@ export interface ResourceSummary {
   headline: string;
   why: string;
   critical: boolean;
+  /** Where the value sits between too little and more than needed. */
+  gauge?: Gauge;
+}
+
+/**
+ * A sweet spot. Most engineering numbers are not "more is better": too little fails, and too much is mass and
+ * money carried for nothing. The bar's first third is too little, the middle just right, the last third more
+ * than needed.
+ */
+export interface Gauge {
+  /** What is measured, and its value in words ("Power to spare", "+34%"). */
+  label: string;
+  value: string;
+  /** The range engineers aim for ("10–40%"). */
+  ideal: string;
+  /** 0–1 along the bar. */
+  pos: number;
+  zone: 'under' | 'right' | 'over';
+  /** Why too little is a problem, and why too much is. */
+  under: string;
+  over: string;
+}
+
+/** Place `x` on a sweet-spot bar whose just-right range is lo…hi; `min` and `max` are the ends of the bar. */
+export function gaugeOf(x: number, lo: number, hi: number, min: number, max: number, text: Pick<Gauge, 'label' | 'value' | 'ideal' | 'under' | 'over'>): Gauge {
+  const c = (v: number) => Math.min(1, Math.max(0, v));
+  const v = Number.isFinite(x) ? x : x > 0 ? max : min;
+  const pos = v < lo ? c((v - min) / (lo - min)) / 3 : v <= hi ? (1 + c((v - lo) / Math.max(1e-9, hi - lo))) / 3 : (2 + c((v - hi) / (max - hi))) / 3;
+  return { ...text, pos, zone: v < lo ? 'under' : v <= hi ? 'right' : 'over' };
 }
 
 export interface ReqResult {
@@ -78,6 +109,17 @@ export interface InstrumentUse {
   deliveredGbitPerDay: number;
 }
 
+/** One line of the build list: a part of the mission that has to be chosen before it can fly. */
+export interface BuildItem {
+  id: string;
+  label: string;
+  role: RoleId;
+  done: boolean;
+  /** Worth doing, but the mission can fly without it. */
+  optional?: boolean;
+  hint: string;
+}
+
 export interface Analysis {
   scenario: Scenario;
   design: StudioDesign;
@@ -89,6 +131,8 @@ export interface Analysis {
   mass: { lines: Line[]; dryKg: number; propellantKg: number; wetKg: number; payloadKg: number; limitKg: number; limitBy: 'platform' | 'launcher'; marginPct: number };
   power: {
     bolW: number; eolW: number; requiredW: number; loadW: number; lines: Line[]; marginPct: number; pointing: number;
+    /** Watts per square metre of array in sunlight, and the share left after ageing. */
+    perM2W: number; ageing: number;
     eclipseWh: number; batteryNeedWh: number; dod: number; dodAllowed: number; batteryLifeYears: number; maxArrayM2: number;
   };
   cost: { lines: Line[]; developmentM: number; launchM: number; operationsM: number; reserveM: number; totalM: number; budgetM: number; marginPct: number };
@@ -104,6 +148,12 @@ export interface Analysis {
   issues: Issue[];
   /** Predicted value (0–1) of each chosen objective, before anything goes wrong in flight. */
   value: Record<string, number>;
+  /** The build list: what is on the assembly stand, and what is still missing. */
+  build: BuildItem[];
+  /** The ground tests planned, the ones left out, and what the plan costs. */
+  tests: { planned: TestId[]; skipped: TestId[]; weeks: number; costM: number };
+  /** People on board: the trip, the supplies, the dose (crewed missions). */
+  crew: CrewPlan | null;
 }
 
 const f0 = (x: number) => (Number.isFinite(x) ? x.toFixed(0) : '∞');
@@ -135,13 +185,26 @@ export function analyze(d: StudioDesign, difficulty: Difficulty = 'engineer'): A
   const ant = ANTENNAS[d.antenna];
   const lv = LAUNCHERS[d.launcher];
   const ins: (Instrument & { id: InstrumentId })[] = d.instruments.filter((id) => INSTRUMENTS[id]).map((id) => ({ ...INSTRUMENTS[id], id }));
-  const years = Math.max(0.25, d.plannedYears);
+  // a crewed flight lasts as long as its trajectory
+  const trip = s.crew ? CREW_TRIPS[d.orbit.type as CrewOrbitId] : undefined;
+  const crewSel = trip ? d.crew ?? { size: 2, eclss: 'open' as const, marginDays: 0, shelter: 'none' as const, suits: 'iva' as const, abort: 'none' as const, shield: 'leo' as const } : undefined;
+  const years = trip ? trip.days / 365.25 : Math.max(0.25, d.plannedYears);
   const transferYears = facts.transferDays / 365.25;
   const geo = d.orbit.type === 'geo';
   const lowEarth = s.body === 'earth' && !geo;
   const reqs = activeRequirements(s, d);
   const relays = ins.filter((i) => i.kind === 'relay');
   const transponders = ins.filter((i) => i.kind === 'transponder');
+  // what is on the assembly stand so far: every mission starts with nothing
+  const has = {
+    structure: d.platform !== 'none', arrays: d.arrayM2 > 0, battery: d.batteryWh > 0, computer: d.computer !== 'none',
+    adcs: d.adcs !== 'none', radio: d.antenna !== 'none', storage: d.storageGbit > 0, launcher: d.launcher !== 'none',
+  };
+  if (!has.structure) issue('fail', 'spacecraft', 'No structure yet: there is nothing to bolt the parts to.', 'Pick a platform on the Spacecraft desk.', 'mass');
+  if (!has.computer) issue('fail', 'spacecraft', 'No onboard computer yet: nothing runs the spacecraft.', 'Pick a computer on the Spacecraft desk.');
+  if (!has.adcs) issue('fail', 'spacecraft', 'No attitude control yet: the spacecraft would tumble.', 'Pick a way to point it on the Spacecraft desk.');
+  if (!has.radio) issue('fail', 'comms', 'No antenna or radio yet: the spacecraft cannot talk to the ground.', 'Pick an antenna on the Comms desk.', 'comms');
+  if (!has.storage) issue('fail', 'comms', 'No onboard storage yet: nothing holds the data between contacts.', 'Pick a storage size on the Comms desk.', 'data');
 
   if (!s.orbitTypes.includes(d.orbit.type)) issue('fail', 'director', `${ORBIT_TYPES[d.orbit.type].name} is not part of this mission.`);
   for (const i of ins) if (!i.bodies.includes(s.body)) issue('fail', 'science', `${i.name} is not built for this mission.`);
@@ -152,10 +215,10 @@ export function analyze(d: StudioDesign, difficulty: Difficulty = 'engineer'): A
     issue('fail', 'comms', 'A UHF dish would have to be tens of metres across.', 'Use a patch or shaped-beam antenna on UHF, or move to S- or X-band for a dish.', 'comms');
     txGain = 5;
   }
-  if (d.antenna === 'dish' && d.dishM > p.maxDishM + 1e-9) issue('fail', 'comms', `A ${f1(d.dishM)} m dish does not fit the ${p.short} platform (largest ${f1(p.maxDishM)} m).`, 'Pick a smaller dish or a bigger platform.', 'comms');
+  if (d.antenna === 'dish' && has.structure && d.dishM > p.maxDishM + 1e-9) issue('fail', 'comms', `A ${f1(d.dishM)} m dish does not fit the ${p.short} platform (largest ${f1(p.maxDishM)} m).`, 'Pick a smaller dish or a bigger platform.', 'comms');
   if (d.antenna === 'dish') {
     const bw = beamwidthDeg(d.dishM, band.freqHz);
-    if (adcs.accuracyDeg > bw / 4) issue('fail', 'spacecraft', `The ${f1(d.dishM)} m dish's beam is only ${f1(bw)}° wide, but ${adcs.name.toLowerCase()} point to ±${adcs.accuracyDeg}°: the beam would miss Earth.`, 'Fly reaction wheels and a star tracker, or use a wider-beam antenna.', 'comms');
+    if (has.adcs && adcs.accuracyDeg > bw / 4) issue('fail', 'spacecraft', `The ${f1(d.dishM)} m dish's beam is only ${f1(bw)}° wide, but ${adcs.name.toLowerCase()} point to ±${adcs.accuracyDeg}°: the beam would miss Earth.`, 'Fly reaction wheels and a star tracker, or use a wider-beam antenna.', 'comms');
   }
   const stationGt = (id: StationId) => STATIONS[id].gt[d.band];
   const ends = (gt: number): LinkEnds => ({ txW: d.txW, txGainDbi: txGain, freqHz: band.freqHz, rxGtDbK: gt, capMbps: band.capMbps, lossDb: band.atmLossDb });
@@ -295,6 +358,31 @@ export function analyze(d: StudioDesign, difficulty: Difficulty = 'engineer'): A
   const payloadKg = sum(ins.map((i) => i.massKg));
   const dragArea = p.size[0] * p.size[2] + (mount.bodyOnly ? 0 : 0.5 * d.arrayM2);
 
+  // people and what keeps them alive
+  const crewMass: Line[] = [], crewPower: Line[] = [], crewCost: Line[] = [];
+  if (trip && crewSel) {
+    const c = crewSel, e = ECLSS[c.eclss];
+    crewMass.push(
+      { name: `Crew of ${c.size}, with seats and suits`, value: c.size * (CREW_KG + SEAT_AND_SUIT_KG), desk: 'science' },
+      { name: `Life support (${e.name.toLowerCase()})`, value: e.hardwareKg, desk: 'science' },
+      { name: `Air, water and food (${trip.days} + ${c.marginDays} days)`, value: e.kgPerCrewDay * c.size * (trip.days + c.marginDays), desk: 'science' },
+      { name: SHELTERS[c.shelter].name, value: SHELTERS[c.shelter].massKg, desk: 'spacecraft' },
+      { name: ABORTS[c.abort].name, value: ABORTS[c.abort].massKg, desk: 'spacecraft' },
+      { name: SHIELDS[c.shield].name, value: SHIELDS[c.shield].massShare * p.structureKg, desk: 'spacecraft' },
+      ...(c.suits === 'eva' ? [{ name: 'Spacewalk suits and airlock', value: c.size * EVA_SUITS.perCrewKg + EVA_SUITS.airlockKg, desk: 'science' as RoleId }] : []),
+    );
+    crewPower.push(
+      { name: 'Life support', value: e.baseW + e.perCrewW * c.size, desk: 'science' },
+      { name: 'Crew equipment and lights', value: CREW_POWER_W * c.size, desk: 'science' },
+    );
+    crewCost.push(
+      { name: `Life support (${e.name.toLowerCase()})`, value: e.costM, desk: 'science' },
+      { name: SHELTERS[c.shelter].name, value: SHELTERS[c.shelter].costM, desk: 'spacecraft' },
+      { name: ABORTS[c.abort].name, value: ABORTS[c.abort].costM, desk: 'spacecraft' },
+      { name: SHIELDS[c.shield].name, value: SHIELDS[c.shield].costM, desk: 'spacecraft' },
+      ...(c.suits === 'eva' ? [{ name: 'Spacewalk suits and airlock', value: EVA_SUITS.costM, desk: 'science' as RoleId }] : []),
+    );
+  }
   let dryKg = p.structureKg + payloadKg;
   let propKg = 0;
   let dvLines: Line[] = [];
@@ -323,6 +411,12 @@ export function analyze(d: StudioDesign, difficulty: Difficulty = 'engineer'): A
       dvLines.push({ name: 'East–west station keeping (2 m/s a year)', value: 2 * years });
       dvLines.push({ name: 'Graveyard orbit at end of life', value: 11 });
       perYear = 48;
+    } else if (trip) {
+      dvLines.push({ name: 'Course corrections, out and back', value: trip.trimMs });
+      if (trip.orbit) {
+        dvLines.push({ name: 'Braking into lunar orbit', value: trip.inMs });
+        dvLines.push({ name: 'Leaving for home', value: trip.outMs });
+      }
     } else if (s.body === 'moon') {
       const t = LUNAR_DV[d.orbit.type as 'llo' | 'elfo' | 'halo'];
       const ins0 = d.orbit.type === 'halo' && d.orbit.transfer === 'lowEnergy' ? t.lowEnergy! : t.insertion;
@@ -347,14 +441,15 @@ export function analyze(d: StudioDesign, difficulty: Difficulty = 'engineer'): A
       { name: 'Structure, mounts and thermal', value: p.structureKg, desk: 'spacecraft' },
       { name: 'Solar arrays', value: arrayKg, desk: 'spacecraft' },
       { name: 'Battery', value: batteryKg, desk: 'spacecraft' },
-      { name: 'Power electronics', value: pcduKg(bolW), desk: 'spacecraft' },
+      { name: 'Power electronics', value: has.arrays ? pcduKg(bolW) : 0, desk: 'spacecraft' },
       { name: d.redundant ? 'Computers (2, one spare)' : 'Computer', value: comp.massKg * (d.redundant ? 2 : 1), desk: 'spacecraft' },
       { name: 'Data storage', value: storageKg(d.storageGbit), desk: 'comms' },
       { name: 'Attitude control', value: adcs.massKg(dryKg), desk: 'spacecraft' },
       { name: 'Propulsion (engines and tanks)', value: prop.dryKg + tankKg, desk: 'spacecraft' },
       { name: d.antenna === 'dish' ? `Antenna (${f1(d.dishM)} m dish)` : 'Antenna', value: ant.massKg(d.dishM), desk: 'comms' },
-      { name: 'Transmitter', value: transmitterKg(d.txW), desk: 'comms' },
+      { name: 'Transmitter', value: has.radio ? transmitterKg(d.txW) : 0, desk: 'comms' },
       ...ins.map((i) => ({ name: i.short, value: i.massKg, desk: 'science' as RoleId })),
+      ...crewMass.filter((l) => l.value > 0),
     ];
     const carried = sum(parts.map((l) => l.value)) - p.structureKg;
     const growth = sum(ins.map((i) => i.massKg * massGrowth(i.trl))) + 0.05 * (carried - payloadKg);
@@ -384,8 +479,9 @@ export function analyze(d: StudioDesign, difficulty: Difficulty = 'engineer'): A
     { name: 'Data storage', value: storageW(d.storageGbit), desk: 'comms' },
     { name: 'Attitude control', value: adcs.powerW(dryKg), desk: 'spacecraft' },
     { name: 'Propulsion heaters and valves', value: prop.powerW, desk: 'spacecraft' },
-    { name: `Transmitter (${f0(txDuty * 100)}% of the time)`, value: (d.txW / band.ampEfficiency) * txDuty, desk: 'comms' },
+    { name: `Transmitter (${f0(txDuty * 100)}% of the time)`, value: has.radio ? (d.txW / band.ampEfficiency) * txDuty : 0, desk: 'comms' },
     ...ins.map((i, k): Line => ({ name: `${i.short} (${f1(uses[k].duty * 100)}% of the time)`, value: i.powerW * uses[k].duty, desk: 'science' })),
+    ...crewPower,
   ] as Line[]).filter((l) => l.value > 0);
   const subtotal = sum(loadLines.map((l) => l.value));
   loadLines.push({ name: 'Power conversion losses', value: 0.05 * subtotal, desk: 'spacecraft' });
@@ -393,7 +489,7 @@ export function analyze(d: StudioDesign, difficulty: Difficulty = 'engineer'): A
   const eolW = bolW * (1 - cell.degradationPerYear) ** (years + transferYears);
   const te = facts.eclipseMin, td = facts.periodMin - te;
   const requiredW = te > 0 ? (loadW * (te / 0.65) + loadW * (td / 0.85)) / td : loadW / 0.85;
-  const powerMargin = eolW / requiredW - 1;
+  const powerMargin = requiredW > 0 ? eolW / requiredW - 1 : 0;
   const eclipseWh = (loadW * te) / 60;
   const cycles = facts.eclipsesPerYear;
   const dodAllowed = Math.min(0.8, 0.2 * Math.sqrt(50_000 / Math.max(1, cycles * years)));
@@ -401,21 +497,45 @@ export function analyze(d: StudioDesign, difficulty: Difficulty = 'engineer'): A
   const batteryNeedWh = Math.max(eclipseWh / (dodAllowed * 0.9), safeModeWh);
   const dod = d.batteryWh > 0 ? eclipseWh / (d.batteryWh * 0.9) : eclipseWh > 0 ? Infinity : 0;
   const batteryLifeYears = cycles > 0 && dod > 0 ? batteryCycleLife(dod) / cycles : Infinity;
-  if (d.arrayM2 > maxArrayM2 + 1e-9) issue('fail', 'spacecraft', `${f1(d.arrayM2)} m² of ${mount.bodyOnly ? 'body-mounted cells does not fit on the box' : 'arrays is more than the platform can carry'} (largest ${f1(maxArrayM2)} m²).`, mount.bodyOnly ? 'Deploy wings, or choose a bigger platform.' : 'Choose a bigger platform or more efficient cells.', 'power');
-  if (dod > 1) issue('fail', 'spacecraft', `The battery runs flat in every ${f0(te)}-minute eclipse (it would need ${f0(eclipseWh / 0.9)} Wh).`, `Fly at least ${f0(batteryNeedWh)} Wh.`, 'power');
+  if (has.structure && d.arrayM2 > maxArrayM2 + 1e-9) issue('fail', 'spacecraft', `${f1(d.arrayM2)} m² of ${mount.bodyOnly ? 'body-mounted cells does not fit on the box' : 'arrays is more than the platform can carry'} (largest ${f1(maxArrayM2)} m²).`, mount.bodyOnly ? 'Deploy wings, or choose a bigger platform.' : 'Choose a bigger platform or more efficient cells.', 'power');
+  if (!has.battery) issue('fail', 'spacecraft', te > 0 ? `No battery yet: the spacecraft dies in its first ${f0(te)}-minute eclipse.` : 'No battery yet: nothing keeps the spacecraft alive if it loses the Sun.', `Fly at least ${f0(batteryNeedWh)} Wh.`, 'power');
+  else if (dod > 1) issue('fail', 'spacecraft', `The battery runs flat in every ${f0(te)}-minute eclipse (it would need ${f0(eclipseWh / 0.9)} Wh).`, `Fly at least ${f0(batteryNeedWh)} Wh.`, 'power');
   else if (d.batteryWh < safeModeWh) issue('warn', 'spacecraft', `The battery cannot keep the spacecraft alive for an hour in safe mode (${f0(safeModeWh)} Wh needed).`, undefined, 'power');
   else if (dod > dodAllowed + 1e-9) issue('warn', 'spacecraft', `Each eclipse drains ${f0(dod * 100)}% of the battery: it will wear out after ${f1(batteryLifeYears)} years (${f0(cycles)} eclipses a year).`, `${f0(batteryNeedWh)} Wh keeps it under ${f0(dodAllowed * 100)}% per eclipse for ${f1(years)} years.`, 'power');
 
   // ---------------------------------------------------------------- attitude control and pointing
   const magneticOk = body.magneticField && !geo;
   if (adcs.needsMagneticField && !magneticOk) issue('fail', 'spacecraft', `Magnetorquers push against a magnetic field, and ${geo ? 'Earth\'s field is too weak at 36 000 km' : `${body.name} has none to speak of`}.`, 'Fly reaction wheels (with thrusters to unload them).', 'power');
-  for (const i of ins) if (i.pointingDeg < adcs.accuracyDeg) issue('warn', 'science', `${i.short} needs pointing to ${i.pointingDeg}°, ${adcs.name.toLowerCase()} give ±${adcs.accuracyDeg}°: its images will smear (pixels ~3× worse).`, 'Reaction wheels and a star tracker point to 0.05°.');
+  if (has.adcs) for (const i of ins) if (i.pointingDeg < adcs.accuracyDeg) issue('warn', 'science', `${i.short} needs pointing to ${i.pointingDeg}°, ${adcs.name.toLowerCase()} give ±${adcs.accuracyDeg}°: its images will smear (pixels ~3× worse).`, 'Reaction wheels and a star tracker point to 0.05°.');
   if (d.adcs === 'wheels' && !magneticOk && prop.isp === 0) issue('warn', 'spacecraft', 'Reaction wheels slowly fill up with momentum; far from Earth only thrusters can unload them.', 'Add propulsion.');
 
   // ---------------------------------------------------------------- payload accommodation
-  if (ins.length > p.slots) issue('fail', 'science', `${ins.length} instruments, but the ${p.short} platform has room for ${p.slots}.`, 'Remove an instrument or choose a bigger platform.', 'mass');
-  if (payloadKg > p.maxPayloadKg) issue('fail', 'science', `The payload weighs ${f0(payloadKg)} kg; the ${p.short} platform carries at most ${f0(p.maxPayloadKg)} kg.`, 'Lighter instruments, or a bigger platform.', 'mass');
+  if (has.structure && ins.length > p.slots) issue('fail', 'science', `${ins.length} instruments, but the ${p.short} platform has room for ${p.slots}.`, 'Remove an instrument or choose a bigger platform.', 'mass');
+  if (has.structure && payloadKg > p.maxPayloadKg) issue('fail', 'science', `The payload weighs ${f0(payloadKg)} kg; the ${p.short} platform carries at most ${f0(p.maxPayloadKg)} kg.`, 'Lighter instruments, or a bigger platform.', 'mass');
   if (ins.length === 0) issue('fail', 'science', 'No instruments on board: the customer pays for a payload.', 'Pick at least one instrument that serves your objective.');
+
+  // ---------------------------------------------------------------- people on board: human rating
+  let crewPlan: CrewPlan | null = null;
+  if (trip && crewSel) {
+    const c = crewSel;
+    const seats = p.crew?.seats ?? 0, cabin = p.crew?.habM3 ?? 0;
+    const need = habNeedM3(trip.days) * c.size;
+    if (has.structure && c.size > seats) issue('fail', 'science', `${c.size} astronauts, but the ${p.short.toLowerCase()} has ${seats} seats.`, 'A bigger capsule or a smaller crew.');
+    if (has.structure && cabin < 0.75 * need) issue('fail', 'science', `${f1(cabin / c.size)} m³ each for ${trip.days} days: people need about ${f1(need / c.size)} m³ each to live and work that long.`, 'A capsule with a habitat module, a smaller crew or a shorter trip.');
+    else if (has.structure && cabin < need) issue('warn', 'science', `The cabin is cramped for ${trip.days} days: ${f1(cabin / c.size)} m³ each, about ${f1(need / c.size)} m³ would be comfortable.`, 'A habitat module, a smaller crew or a shorter trip.');
+    if (c.abort === 'none') issue('fail', 'spacecraft', 'No launch escape system: if the rocket fails, the crew goes with it.', 'Fit an escape tower or built-in abort engines (Spacecraft desk).');
+    if (c.shield === 'leo') issue('fail', 'spacecraft', 'The heat shield is built for 8 km/s. Coming home from the Moon the capsule hits the air at 11 km/s.', 'Fit the lunar-return heat shield (Spacecraft desk).');
+    if (has.launcher && !lv.crewRated) issue('fail', 'director', `${lv.name} is not certified to carry people.`, 'Choose a crew-rated launcher.');
+    if (has.computer && !d.redundant) issue('fail', 'spacecraft', 'One computer and no spare: a crewed ship must survive any single failure.', 'Add the spare computer (Spacecraft desk).');
+    if (c.shelter === 'none') issue('warn', 'science', `No storm shelter: one large solar storm would give each astronaut about ${SHELTERS.none.stormMsv} mSv through the cabin wall.`, 'Plan at least a stowage shelter (Payload desk).');
+    if (c.marginDays < 1) issue('warn', 'science', 'No spare days of air, water and food: any delay on the way home is an emergency.', 'Carry at least two days of margin (Payload desk).');
+    crewPlan = {
+      callSign: s.crew!.callSign, size: c.size, days: trip.days, moonDays: trip.moonDays, outboundDays: trip.outboundDays, orbit: trip.orbit,
+      inMs: trip.inMs, outMs: trip.outMs, supplyDays: trip.days + c.marginDays, marginDays: c.marginDays,
+      doseMsv: GCR_MSV_PER_DAY * trip.days + SHELTERS[c.shelter].stormMsv, cabinM3: cabin, cabinNeedM3: need,
+      abortSaves: ABORTS[c.abort].saves, shieldOk: c.shield === 'lunar',
+    };
+  }
 
   // ---------------------------------------------------------------- launcher
   const destination = { leo: 'low Earth orbit', sso: 'sun-synchronous orbit', gto: 'geostationary transfer orbit', tli: 'the Moon', mars: 'Mars' }[facts.target];
@@ -438,8 +558,8 @@ export function analyze(d: StudioDesign, difficulty: Difficulty = 'engineer'): A
     if (Math.max(p.size[0], p.size[1]) > l.fairingM) why.push(`The ${p.short} platform is wider than ${l.name}'s fairing (${f1(l.fairingM)} m).`);
     return { cap, price, why };
   };
-  const { cap: capacityKg, price: priceM, why: reasons } = fit(d.launcher);
-  for (const r of reasons) issue('fail', 'director', r, 'Choose another launcher, or make the spacecraft lighter.', 'mass');
+  const { cap: capacityKg, price: priceM, why: reasons } = has.launcher ? fit(d.launcher) : { cap: 0, price: 0, why: ['No launcher yet: nothing takes the spacecraft to its orbit.'] };
+  for (const r of reasons) issue('fail', 'director', r, has.launcher ? 'Choose another launcher, or make the spacecraft lighter.' : 'Pick a rocket on the Mission desk.', 'mass');
   // a cheaper rocket that could do the same job is money left on the table
   const launchOptions = s.launchers.map((id) => ({ id, ...fit(id) }));
   const cheaper = launchOptions
@@ -452,30 +572,37 @@ export function analyze(d: StudioDesign, difficulty: Difficulty = 'engineer'): A
     { name: 'Platform (structure and integration design)', value: p.costM, desk: 'spacecraft' },
     { name: 'Solar arrays', value: d.arrayM2 * cell.costPerM2M + mount.costM(d.arrayM2), desk: 'spacecraft' },
     { name: 'Battery', value: d.batteryWh * BATTERY_COST_PER_WH_M, desk: 'spacecraft' },
-    { name: 'Power electronics', value: pcduCostM(bolW), desk: 'spacecraft' },
+    { name: 'Power electronics', value: has.arrays ? pcduCostM(bolW) : 0, desk: 'spacecraft' },
     { name: d.redundant ? 'Computers (with a spare)' : 'Computer', value: comp.costM * (d.redundant ? 1.6 : 1), desk: 'spacecraft' },
     { name: 'Data storage', value: storageCostM(d.storageGbit), desk: 'comms' },
     { name: 'Attitude control', value: adcs.costM(dryKg), desk: 'spacecraft' },
     { name: 'Propulsion', value: prop.costM, desk: 'spacecraft' },
-    { name: 'Antenna and transmitter', value: ant.costM(d.dishM) + transmitterCostM(d.txW), desk: 'comms' },
+    { name: 'Antenna and transmitter', value: has.radio ? ant.costM(d.dishM) + transmitterCostM(d.txW) : 0, desk: 'comms' },
     ...ins.map((i): Line => ({ name: i.short, value: i.costM, desk: 'science' })),
+    ...crewCost.filter((l) => l.value > 0),
   ];
   const hardware = sum(hw.map((l) => l.value));
-  const ait = Math.max(0.1, AIT_COST_FRACTION * hardware);
+  const ait = hardware > 0 ? Math.max(0.1, AIT_COST_FRACTION * hardware) : 0;
+  // the test campaign: each test costs a share of the hardware and some weeks
+  const plannedTests = applicableTests(d).filter((t) => d.tests.includes(t));
+  const skippedTests = applicableTests(d).filter((t) => !d.tests.includes(t));
+  const testsM = sum(plannedTests.map((t) => TESTS[t].costShare * hardware));
+  const testWeeks = sum(plannedTests.map((t) => TESTS[t].weeks));
   const opsYears = years + transferYears;
   const groundM = deep
     ? (deepStations.length ? Math.max(...deepStations.map((id) => STATIONS[id].costPerHourM ?? 0)) : 0) * d.trackHoursPerDay * 365.25 * opsYears
     : sum(earthStations.map((id) => STATIONS[id].costPerYearM ?? 0)) * opsYears;
-  const opsM = s.opsPerYearM * opsYears;
-  const developmentM = hardware + ait;
+  const opsM = s.opsPerYearM * opsYears + (s.opsPerMissionM ?? 0);
+  const developmentM = hardware + ait + testsM;
   const reserveM = (d.reservePct / 100) * developmentM;
   const insuranceM = d.insurance ? 0.08 * (developmentM + priceM) : 0;
   const costLines: Line[] = [
     ...hw,
-    { name: 'Assembly, integration and test', value: ait, desk: 'spacecraft' },
+    { name: 'Assembly and integration', value: ait, desk: 'spacecraft' },
+    { name: `Test campaign (${plannedTests.length} test${plannedTests.length === 1 ? '' : 's'}, ${f0(testWeeks)} weeks)`, value: testsM, desk: 'director' },
     { name: `Launch (${lv.name})`, value: priceM, desk: 'director' },
     { name: `Ground stations (${f1(opsYears)} years)`, value: groundM, desk: 'comms' },
-    { name: `Operations team (${f1(opsYears)} years)`, value: opsM, desk: 'director' },
+    { name: trip ? `Mission control, training and recovery (${trip.days} days)` : `Operations team (${f1(opsYears)} years)`, value: opsM, desk: 'director' },
     { name: `Reserve (${f0(d.reservePct)}% of development)`, value: reserveM, desk: 'resources' },
     ...(d.insurance ? [{ name: 'Launch + first-year insurance', value: insuranceM, desk: 'resources' as RoleId }] : []),
   ];
@@ -490,9 +617,10 @@ export function analyze(d: StudioDesign, difficulty: Difficulty = 'engineer'): A
     { name: comp.name, value: comp.devMonths },
     { name: adcs.name, value: adcs.devMonths },
     { name: prop.name, value: prop.devMonths },
+    ...(crewSel ? [{ name: `Life support (${ECLSS[crewSel.eclss].name.toLowerCase()})`, value: ECLSS[crewSel.eclss].devMonths }] : []),
   ];
   const longest = devParts.reduce((a, b) => (b.value > a.value ? b : a));
-  const devMonths = longest.value + p.aitMonths + (d.redundant ? 1 : 0);
+  const devMonths = longest.value + p.aitMonths + (d.redundant ? 1 : 0) + testWeeks / 4.345;
   let launchMonth = devMonths;
   if (lv.rideshare) launchMonth = Math.ceil(devMonths / 4) * 4;
   if (s.windows) launchMonth = s.windows.find((w) => w >= devMonths) ?? Infinity;
@@ -512,8 +640,8 @@ export function analyze(d: StudioDesign, difficulty: Difficulty = 'engineer'): A
   if (perYear > 0 && prop.isp > 0) limits.push({ name: 'Propellant', value: Math.max(0, capability - dvFixed) / perYear });
   if (Number.isFinite(batteryLifeYears)) limits.push({ name: 'Battery wear', value: batteryLifeYears });
   // low-orbit instruments by maturity; deep-space and GEO payloads are built for their radiation
-  const tolerance = Math.min(comp.toleranceKrad, ...ins.map((i) => i.toleranceKrad ?? (i.bodies.includes('earth') ? (i.trl >= 8 ? 60 : 30) : 100)));
-  limits.push({ name: `Radiation (${f1(facts.radKradPerYear)} krad a year)`, value: tolerance / (2 * facts.radKradPerYear) });
+  const tolerance = Math.min(has.computer ? comp.toleranceKrad : Infinity, ...ins.map((i) => i.toleranceKrad ?? (i.bodies.includes('earth') ? (i.trl >= 8 ? 60 : 30) : 100)));
+  if (Number.isFinite(tolerance)) limits.push({ name: `Radiation (${f1(facts.radKradPerYear)} krad a year)`, value: tolerance / (2 * facts.radKradPerYear) });
   if (bolW > requiredW && cell.degradationPerYear > 0) limits.push({ name: 'Solar cell ageing', value: Math.log(requiredW / bolW) / Math.log(1 - cell.degradationPerYear) - transferYears });
   const lifetimeYears = Math.max(0, Math.min(...limits.map((l) => l.value)));
   const lifeLimiter = limits.reduce((a, b) => (b.value < a.value ? b : a));
@@ -669,6 +797,28 @@ export function analyze(d: StudioDesign, difficulty: Difficulty = 'engineer'): A
         value = facts.altKm;
         why = `The orbit's low point is ${f0(facts.altKm)} km.`;
         break;
+      case 'crewDose':
+        value = crewPlan ? crewPlan.doseMsv : NaN;
+        why = crewPlan && crewSel ? `${f0(GCR_MSV_PER_DAY * crewPlan.days)} mSv of cosmic rays in ${crewPlan.days} days, plus ${SHELTERS[crewSel.shelter].stormMsv} mSv if a large solar storm hits (${SHELTERS[crewSel.shelter].name.toLowerCase()}). A shorter trip or a better shelter lowers it.` : 'Nobody on board.';
+        break;
+      case 'supplies':
+        value = crewPlan ? crewPlan.marginDays : NaN;
+        why = crewPlan ? `Supplies for ${crewPlan.supplyDays} days on a ${crewPlan.days}-day trip. Each spare day weighs ${f0(ECLSS[crewSel!.eclss].kgPerCrewDay * crewPlan.size)} kg.` : 'Nobody on board.';
+        break;
+      case 'moonDays':
+        value = trip ? trip.moonDays : NaN;
+        why = trip ? `${ORBIT_TYPES[d.orbit.type].name}: ${trip.moonDays} day${trip.moonDays === 1 ? '' : 's'} near the Moon in a ${trip.days}-day flight.` : '';
+        break;
+      case 'downlink': {
+        const laser = d.instruments.includes('o2o');
+        value = Math.max(rateWorst, laser ? 80 : 0);
+        why = laser ? `The laser terminal sends 80 Mbps when the sky over the ground telescope is clear; the radio carries ${f2(rateWorst)} Mbps the rest of the time.` : `The radio carries ${f2(rateWorst)} Mbps from the Moon. A bigger dish, more power or a laser terminal raises it.`;
+        break;
+      }
+      case 'crewSize':
+        value = crewPlan ? crewPlan.size : NaN;
+        why = crewPlan ? `${crewPlan.size} astronauts on board.` : '';
+        break;
     }
     const ok = (v: number, x: number) => (req.better === 'lower' ? v <= x : v >= x);
     const met: ReqResult['met'] = Number.isNaN(value) ? 'fail' : ok(value, req.goal) ? 'goal' : ok(value, req.threshold) ? 'threshold' : 'fail';
@@ -694,7 +844,7 @@ export function analyze(d: StudioDesign, difficulty: Difficulty = 'engineer'): A
   // ---------------------------------------------------------------- the six resources
   const massLimit = Math.min(p.maxMassKg, capacityKg || Infinity);
   const limitBy: 'platform' | 'launcher' = capacityKg && capacityKg < p.maxMassKg ? 'launcher' : 'platform';
-  const massMargin = (massLimit - wetKg) / massLimit;
+  const massMargin = massLimit > 0 ? (massLimit - wetKg) / massLimit : 0;
   const critical = new Set(s.critical);
   const res = (id: ResourceId, v: number, limit: number, marginPct: number, status: Status, headline: string, why: string): ResourceSummary => ({
     id, name: RESOURCES[id].name, value: v, limit, unit: RESOURCES[id].unit, marginPct, status, headline, why, critical: critical.has(id),
@@ -702,11 +852,11 @@ export function analyze(d: StudioDesign, difficulty: Difficulty = 'engineer'): A
   const thin = difficulty === 'expert' ? 10 : 5;
   const relayProx = relays.length ? proxRate(relaySite, relays).best : 0;
   const resources: Record<ResourceId, ResourceSummary> = {
-    mass: res('mass', wetKg, massLimit, massMargin * 100,
+    mass: !has.structure ? res('mass', wetKg, 0, 0, 'fail', 'Nothing built yet', 'The platform you pick sets how much the spacecraft may weigh, and the launcher how much can be lifted.') : res('mass', wetKg, massLimit, massMargin * 100,
       massMargin < 0 || reasons.length ? 'fail' : massMargin * 100 < thin ? 'warn' : cheaper ? 'over' : 'good',
       `${f0(wetKg)} / ${f0(massLimit)} kg`,
       `Dry ${f0(dryKg)} kg (payload ${f0(payloadKg)} kg) + ${f0(propKg)} kg of propellant for ${f0(totalDv)} m/s. The limit is set by the ${limitBy === 'launcher' ? `${lv.name}'s lift to this orbit` : `${p.short} platform`}.${cheaper ? ` ${LAUNCHERS[cheaper.id].name} could launch it for $${f1(cheaper.price)}M.` : ''}`),
-    power: res('power', requiredW, eolW, powerMargin * 100,
+    power: !has.arrays ? res('power', requiredW, 0, -100, 'fail', `No solar arrays yet · ${f0(requiredW)} W needed`, 'Nothing makes electricity yet. The arrays must cover what the spacecraft uses and recharge the battery after every shadow.') : res('power', requiredW, eolW, powerMargin * 100,
       powerMargin < 0 || dod > 1 ? 'fail' : powerMargin < 0.1 || dod > dodAllowed + 1e-9 ? 'warn' : powerMargin > 0.8 ? 'over' : 'good',
       `${f0(eolW)} W made · ${f0(requiredW)} W needed`,
       `${f1(d.arrayM2)} m² of ${cell.name.toLowerCase()} cells (${mount.name.toLowerCase()}) make ${f0(bolW)} W in sunlight, ${f0(eolW)} W after ${f1(years + transferYears)} years of ageing${facts.sunFactor < 0.9 ? `, with only ${f0(facts.sunFactor * 100)}% of Earth's sunlight` : ''}. The spacecraft uses ${f0(loadW)} W on average${te > 0 ? ` and must also recharge the battery after up to ${f0(te)} minutes of shadow each orbit` : ''}. Battery: ${f0(d.batteryWh)} Wh, ${f0(dod * 100)}% used per eclipse.`),
@@ -732,20 +882,75 @@ export function analyze(d: StudioDesign, difficulty: Difficulty = 'engineer'): A
       rateTyp <= 0 || d.stations.length === 0 ? 'fail' : marginDb < 0 ? 'warn' : 'good',
       `${f2(rateTyp)} Mbps · ${f0(contactMin)} min/day`,
       `${band.name} with ${d.antenna === 'dish' ? `a ${f1(d.dishM)} m dish (${f1(txGain)} dBi)` : `a ${ant.name.toLowerCase()} (${f0(txGain)} dBi)`} and ${f0(d.txW)} W, heard by ${stationName}: ${f2(rateTyp)} Mbps typical, ${f2(rateWorst)} Mbps at ${f0(rangeKm)} km.${lightTime > 1 ? ` Signals take ${f1(lightTime / 60)} minutes each way.` : ''}`),
-    time: res('time', launchMonth, deadlineMonth, Number.isFinite(deadlineMonth) ? ((deadlineMonth - launchMonth) / deadlineMonth) * 100 : 100,
+    time: !has.structure ? res('time', 0, deadlineMonth, 100, 'warn', Number.isFinite(deadlineMonth) ? `Nothing to build yet · launch by month ${f0(deadlineMonth)}` : 'Nothing to build yet', 'The slowest part to build sets the schedule, then assembly and the tests you plan.') : res('time', launchMonth, deadlineMonth, Number.isFinite(deadlineMonth) ? ((deadlineMonth - launchMonth) / deadlineMonth) * 100 : 100,
       launchMonth > deadlineMonth ? 'fail' : lifetimeYears < years * 0.999 ? 'warn' : deadlineMonth - launchMonth < 2 ? 'warn' : 'good',
-      `Launch month ${f0(launchMonth)} / ${f0(deadlineMonth)} · ${f1(lifetimeYears)} yr life`,
+      trip ? `Launch month ${f0(launchMonth)} / ${f0(deadlineMonth)} · ${trip.days}-day flight` : `Launch month ${f0(launchMonth)} / ${f0(deadlineMonth)} · ${f1(lifetimeYears)} yr life`,
       `Build ${f0(devMonths)} months (slowest: ${longest.name}), launch at month ${f0(launchMonth)}${s.windows ? ' (launch window)' : ''}, in service from month ${f0(serviceMonth)}. Lifetime ${f1(lifetimeYears)} years, limited by ${lifeLimiter.name.toLowerCase()}.`),
   };
+  // tests left out: a risk the team chooses, said once per test
+  if (has.structure && difficulty !== 'sandbox') for (const t of skippedTests) issue('warn', TESTS[t].role, `No ${TESTS[t].name.toLowerCase()} planned. It would catch: ${TESTS[t].catches.charAt(0).toLowerCase()}${TESTS[t].catches.slice(1)}`, `Add it to the test campaign on the Mission desk (${TESTS[t].weeks} week${TESTS[t].weeks === 1 ? '' : 's'}).`);
+  const needsEngine = totalDv > 0 && !lowEarth;
+  const build: BuildItem[] = [
+    { id: 'structure', label: 'Structure', role: 'spacecraft', done: has.structure, hint: 'Pick a platform: the body every other part bolts to.' },
+    { id: 'power', label: 'Solar arrays', role: 'spacecraft', done: has.arrays, hint: 'Add solar arrays: they make the electricity.' },
+    { id: 'battery', label: 'Battery', role: 'spacecraft', done: has.battery, hint: 'Add a battery: it carries the spacecraft through every shadow.' },
+    { id: 'computer', label: 'Computer', role: 'spacecraft', done: has.computer, hint: 'Pick the onboard computer.' },
+    { id: 'pointing', label: 'Pointing', role: 'spacecraft', done: has.adcs, hint: 'Pick how the spacecraft points itself.' },
+    ...(needsEngine ? [{ id: 'engine', label: 'Engine', role: 'spacecraft' as RoleId, done: prop.isp > 0, hint: 'This mission needs an engine to brake into its orbit.' }] : []),
+    { id: 'payload', label: 'Payload', role: 'science', done: ins.length > 0, hint: 'Pick the instruments that do the customer\'s job.' },
+    { id: 'radio', label: 'Radio', role: 'comms', done: has.radio && has.storage, hint: 'Pick an antenna and the onboard storage.' },
+    { id: 'station', label: 'Ground station', role: 'comms', done: d.stations.length > 0, hint: 'Pick who listens on the ground.' },
+    { id: 'launcher', label: 'Launcher', role: 'director', done: has.launcher, hint: 'Pick the rocket.' },
+    ...(crewSel ? [
+      { id: 'escape', label: 'Escape system', role: 'spacecraft' as RoleId, done: crewSel.abort !== 'none', optional: true, hint: 'A way off a failing rocket.' },
+      { id: 'shield', label: 'Lunar heat shield', role: 'spacecraft' as RoleId, done: crewSel.shield === 'lunar', optional: true, hint: 'The return from the Moon is at 11 km/s.' },
+    ] : []),
+    { id: 'tests', label: 'Test plan', role: 'director', done: plannedTests.length > 0, optional: true, hint: 'Decide which ground tests to run before launch.' },
+  ];
+  // ---------------------------------------------------------------- sweet spots: too little, just right, more than needed
+  const pct = (x: number) => `${x >= 0 ? '+' : ''}${f0(x)}%`;
+  const spareData = generated > 0 ? ((capacityDay - generated) / generated) * 100 : 0;
+  const slack = deadlineMonth - launchMonth;
+  if (has.structure) resources.mass.gauge = gaugeOf(massMargin * 100, thin, 30, -30, 90, {
+    label: 'Lift to spare', value: pct(massMargin * 100), ideal: `${thin}–30%`,
+    under: 'Too heavy: the rocket or the platform cannot carry it, or there is no room left for the mass that every project gains while it is built.',
+    over: 'You are paying for lift you do not use. A smaller rocket or platform would be cheaper, or the spare kilograms could carry another instrument.',
+  });
+  if (has.arrays) resources.power.gauge = gaugeOf(powerMargin * 100, 10, 40, -50, 150, {
+    label: 'Power to spare', value: pct(powerMargin * 100), ideal: '10–40%',
+    under: 'Not enough power: instruments switch off and the battery never fully recharges after a shadow.',
+    over: 'Extra power is not free. Every square metre of array is mass the rocket lifts and money not spent on instruments; big wings also catch more air drag in low orbit and are harder to hold steady. Engineers aim for a modest margin, not the biggest array.',
+  });
+  if (Number.isFinite(budgetM)) resources.budget.gauge = gaugeOf(((budgetM - totalM) / budgetM) * 100, 0, 15, -40, 60, {
+    label: 'Budget left', value: pct(((budgetM - totalM) / budgetM) * 100), ideal: '0–15%',
+    under: 'Over budget: the customer cannot pay for this design.',
+    over: 'Money left over is mission you did not buy: a better instrument, a goal-level requirement, more tests or a bigger reserve.',
+  });
+  if (!transponders.length && !(generated === 0 && relays.length) && generated > 0 && capacityDay > 0) resources.data.gauge = gaugeOf(spareData, 0, 100, -100, 500, {
+    label: 'Downlink to spare', value: pct(spareData), ideal: '0–100%',
+    under: 'The instruments make more than the link can send: the rest is lost, or never taken.',
+    over: 'The link is far bigger than the instruments need. Transmitter power, antenna size and ground-station time are being paid for and not used.',
+  });
+  if (rateTyp > 0 && Number.isFinite(marginDb)) resources.comms.gauge = gaugeOf(marginDb, 3, 10, -10, 30, {
+    label: 'Signal to spare', value: `${marginDb >= 0 ? '+' : ''}${f1(marginDb)} dB`, ideal: '3–10 dB',
+    under: 'The signal arrives too weak at the farthest point: errors, or no link at all when it rains.',
+    over: 'More signal than needed. A smaller transmitter or antenna would save power and mass, or the same link could carry a faster data rate.',
+  });
+  if (has.structure && Number.isFinite(deadlineMonth)) resources.time.gauge = gaugeOf(slack, 2, 8, -12, 24, {
+    label: 'Schedule to spare', value: `${slack >= 0 ? '+' : ''}${f0(slack)} months`, ideal: '2–8 months',
+    under: slack < 0 ? 'Late: the launch comes after the deadline.' : 'No room for a late part or a failed test.',
+    over: 'A lot of slack: there was time for a more capable instrument, or for more tests.',
+  });
   if (totalM > budgetM) issue('fail', 'resources', `$${f1(totalM)}M is over the $${f0(budgetM)}M budget.`, 'Cheaper parts, a smaller launcher, fewer years of operations, or a smaller reserve.', 'budget');
-  if (!transponders.length && !deep && lossPct > 0.5) issue(lossPct > 10 ? 'fail' : 'warn', 'comms', `${f0(lossPct)}% of the data never reaches the ground.`, capacityDay < generated ? 'A faster band, more transmitter power, a better antenna or more ground stations.' : 'More onboard storage to hold data between passes.', 'data');
-  if (powerMargin < 0) issue('fail', 'spacecraft', `The arrays make ${f0(eolW)} W by the end of the mission; the spacecraft needs ${f0(requiredW)} W.`, `About ${f1(requiredW / perM2 / Math.pow(1 - cell.degradationPerYear, years + transferYears))} m² of arrays would do.`, 'power');
+  if (!transponders.length && !deep && lossPct > 0.5 && has.radio && has.storage && d.stations.length > 0) issue(lossPct > 10 ? 'fail' : 'warn', 'comms', `${f0(lossPct)}% of the data never reaches the ground.`, capacityDay < generated ? 'A faster band, more transmitter power, a better antenna or more ground stations.' : 'More onboard storage to hold data between passes.', 'data');
+  if (!has.arrays) issue('fail', 'spacecraft', 'No solar arrays yet: nothing makes electricity.', 'Add solar arrays on the Spacecraft desk.', 'power');
+  else if (powerMargin < 0) issue('fail', 'spacecraft', `The arrays make ${f0(eolW)} W by the end of the mission; the spacecraft needs ${f0(requiredW)} W.`, `About ${f2(requiredW / perM2 / Math.pow(1 - cell.degradationPerYear, years + transferYears))} m² of arrays would just do; add 10–40% for margin ("Size it for me").`, 'power');
 
   return {
     scenario: s, design: d, difficulty, orbit: facts, access, lunar,
     dv: { lines: dvLines, totalMs: totalDv, perYearMs: perYear, capabilityMs: capability },
     mass: { lines: [...massLines, { name: 'Propellant', value: propKg, desk: 'director' as RoleId }], dryKg, propellantKg: propKg, wetKg, payloadKg, limitKg: massLimit, limitBy, marginPct: massMargin * 100 },
-    power: { bolW, eolW, requiredW, loadW, lines: loadLines, marginPct: powerMargin * 100, pointing, eclipseWh, batteryNeedWh, dod, dodAllowed, batteryLifeYears, maxArrayM2 },
+    power: { bolW, eolW, requiredW, loadW, lines: loadLines, marginPct: powerMargin * 100, pointing, perM2W: perM2, ageing: (1 - cell.degradationPerYear) ** (years + transferYears), eclipseWh, batteryNeedWh, dod, dodAllowed, batteryLifeYears, maxArrayM2 },
     cost: { lines: costLines, developmentM, launchM: priceM, operationsM: groundM + opsM, reserveM, totalM, budgetM, marginPct: ((budgetM - totalM) / budgetM) * 100 },
     data: { instruments: uses, generatedGbitDay: generated, capacityGbitDay: capacityDay, deliveredGbitDay: deliveredDay, lossPct, storageNeedGbit: storageNeed, latencyH: access ? Math.min(...regionsNeeded.map((r) => access!.regions[r]!.latencyH)) : (24 - d.trackHoursPerDay) / 2 + lightTime / 3600, missionTbit, dataLimited },
     comms: { rateMbps: rateTyp, worstMbps: rateWorst, marginDb, contactMinPerDay: contactMin, passesPerDay: passes, rangeKm, lightTimeS: lightTime, station: stationName },
@@ -755,5 +960,8 @@ export function analyze(d: StudioDesign, difficulty: Difficulty = 'engineer'): A
     resources,
     issues,
     value,
+    build,
+    tests: { planned: plannedTests, skipped: skippedTests, weeks: testWeeks, costM: testsM },
+    crew: crewPlan,
   };
 }

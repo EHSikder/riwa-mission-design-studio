@@ -117,6 +117,12 @@ const isLocalRequest = (/** @type {Req} */ req) => /^(\[|localhost|127\.|10\.|19
 export function roomHandler(req, res, next) {
   const url = new URL(req.url ?? '/', 'http://local');
   if (!url.pathname.startsWith('/api/')) return next();
+  // a copy of the game on another site (the Vercel one) may use these rooms: allow it to ask
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204, { 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type', 'Access-Control-Max-Age': '86400' });
+    return res.end();
+  }
   const now = Date.now();
   for (const [code, r] of rooms) if (r.clients.size === 0 && now - r.touched > IDLE_MS) rooms.delete(code);
 

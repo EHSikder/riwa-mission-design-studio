@@ -10,9 +10,10 @@ export type InstrumentId =
   | 'cubecam' | 'msWide' | 'ms10' | 'hr3' | 'vhr1' | 'sar' | 'tir' | 'hsi' | 'ais'
   | 'cband' | 'kuband' | 'kaHts'
   | 'proxS' | 'proxX' | 'lfr' | 'lunarCam'
-  | 'hirise' | 'ctx' | 'crism' | 'sharad' | 'mcs' | 'uvs' | 'mag';
+  | 'hirise' | 'ctx' | 'crism' | 'sharad' | 'mcs' | 'uvs' | 'mag'
+  | 'crewCam' | 'pilotKit' | 'radSensors' | 'bioLab' | 'o2o';
 
-export type InstrumentKind = 'imager' | 'sar' | 'spectrometer' | 'sounder' | 'receiver' | 'transponder' | 'relay' | 'field';
+export type InstrumentKind = 'imager' | 'sar' | 'spectrometer' | 'sounder' | 'receiver' | 'transponder' | 'relay' | 'field' | 'crew';
 export type CommsBand = 'C' | 'Ku' | 'Ka';
 
 export interface Instrument extends Sourced {
@@ -225,6 +226,42 @@ export const INSTRUMENTS: Record<InstrumentId, Instrument> = {
     massKg: 3, powerW: 3, costM: 2, devMonths: 12, trl: 9,
     dataMbps: 0.002, daylight: false, cloudLimited: false, pointingDeg: 2, dutyMax: 1,
     source: 'Fluxgate magnetometers (MAVEN/MGS class); estimates', ...EST,
+  },
+  // -------------------------------------------------------------- crewed flights
+  crewCam: {
+    name: 'Crew cameras and window kit', short: 'Crew cameras', kind: 'crew', bodies: ['moon'],
+    explain: 'Handheld cameras, a window mount and a studio light: Earthrise in 4K, and the crew talking to schools from 400 000 km away.',
+    massKg: 25, powerW: 60, costM: 4, devMonths: 8, trl: 9,
+    dataMbps: 12, daylight: false, cloudLimited: false, pointingDeg: 5, dutyMax: 0.15,
+    source: 'Artemis II carried handheld and mounted cameras for live broadcasts; values are estimates', ...EST,
+  },
+  pilotKit: {
+    name: 'Manual piloting demonstration kit', short: 'Piloting kit', kind: 'crew', bodies: ['moon'],
+    explain: 'Docking cameras, a target and extra thruster propellant so the crew can fly the ship by hand around its spent rocket stage, as Artemis II did.',
+    massKg: 60, powerW: 80, costM: 14, devMonths: 12, trl: 8,
+    dataMbps: 2, daylight: false, cloudLimited: false, pointingDeg: 1, dutyMax: 0.03,
+    source: 'Artemis II proximity operations demonstration; values are estimates', ...EST,
+  },
+  radSensors: {
+    name: 'Radiation sensors and dosimeters', short: 'Radiation sensors', kind: 'crew', bodies: ['moon'],
+    explain: 'Sensors around the cabin and a badge on every astronaut: how much radiation people really take beyond Earth\'s magnetic shield.',
+    massKg: 15, powerW: 20, costM: 6, devMonths: 10, trl: 9,
+    dataMbps: 0.01, daylight: false, cloudLimited: false, pointingDeg: 180, dutyMax: 1,
+    source: 'Artemis I and II radiation sensors (HERA, M-42, crew dosimeters); values are estimates', ...EST,
+  },
+  bioLab: {
+    name: 'Organ-chip biology lab', short: 'Bio lab', kind: 'crew', bodies: ['moon'],
+    explain: 'Living human cells on chips the size of a thumb drive, riding with the crew to show what deep space does to the body.',
+    massKg: 30, powerW: 60, costM: 18, devMonths: 16, trl: 6,
+    dataMbps: 0.05, daylight: false, cloudLimited: false, pointingDeg: 180, dutyMax: 1,
+    source: 'NASA AVATAR organ-chip investigation on Artemis II; values are estimates', ...EST,
+  },
+  o2o: {
+    name: 'Laser communications terminal', short: 'Laser link', kind: 'crew', bodies: ['moon'],
+    explain: 'A 10 cm telescope that sends data on a beam of infrared light: up to 80 Mbps from the Moon, enough for live 4K video, when the sky over the ground telescope is clear.',
+    massKg: 35, powerW: 120, costM: 35, devMonths: 18, trl: 7,
+    dataMbps: 0, daylight: false, cloudLimited: false, pointingDeg: 0.05, dutyMax: 0.3,
+    source: 'Orion Artemis II Optical Communications System (O2O), up to 260 Mbps; our 80 Mbps allows for clouds and pointing; mass and cost are estimates', ...EST,
   },
 };
 

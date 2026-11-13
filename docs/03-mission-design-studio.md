@@ -1,6 +1,8 @@
-# Space Underdogs: design
+# RIWA Space Journey: design
 
 How the game is designed and what is built. Written for teammates and judges who want more than the README.
+
+> **14 November 2026: the rework.** The spacecraft now starts as an empty assembly stand and is built part by part; the team plans a test campaign and runs each test itself; launch day, commissioning (unfold, first signal, the braking burn, first light) and problems in orbit are hands-on steps, the problems shown as telemetry with one hidden cause; a sixth mission flies a crew around the Moon; a Guided level points at every click; team roles are shared out on a who-does-what grid; resources show a sweet spot (too little, just right, more than needed); and the screens were rebuilt (desk rail, folding panels, space backdrop, sound, launch show, saved designs). Sections 3, 6 and 11 describe it; the rest of this document still holds.
 
 ## 1. What the challenge asks for (our reading, in our own words)
 
@@ -103,11 +105,11 @@ audience well.
 
 | # | Screen | What the team does | Teaches |
 |---|---|---|---|
-| 1 | Mission select | Pick a scenario, a difficulty, and solo / same-screen / LAN | Mission types |
+| 1 | Mission select | Pick a scenario (six), a difficulty (Guided, Cadet, Engineer, Expert, Sandbox), and solo / one screen / online, with a who-does-what grid | Mission types |
 | 2 | Brief | Read the customer's need; pick a primary objective (plus optional secondaries); set each requirement to *threshold* or *goal* | Objectives drive requirements |
-| 3 | Design desks | Mission (orbit, launcher, schedule) · Spacecraft (structure, power, battery, computer, attitude control, propulsion) · Science (instruments, observation plan) · Comms (band, antenna, transmitter, storage, ground stations) · Resources (allocations, reserve, approvals) | Each subsystem and its trade-offs |
+| 3 | Design desks | Build from an empty stand. Mission (objectives, orbit or trajectory, launcher, **test campaign**, schedule) · Spacecraft (structure or capsule, arrays, battery, computer, attitude control, propulsion, escape system, heat shield) · Payload (instruments; crew and life support) · Comms (band, antenna, transmitter, storage, ground stations) · Resources (allocations, reserve, approvals). Each desk opens from a rail; each part is a section that opens with a click and shows whether it is chosen | Each subsystem and its trade-offs; concurrent design (JPL Team X, ESA CDF) |
 | 4 | Review and GO/NO-GO poll | Predicted requirement checks, launcher fit, margins; every role calls GO or NO-GO | Design review culture |
-| 5 | Simulate | Launch → commissioning → years of operations compressed into a minute or two; random events pause the run for a team decision | Operations, risk, live resources |
+| 5 | Build and fly | Build → run each planned test (a flaw it finds: fix or fly) → launch day (weather go/no-go, the launch show) → commissioning (unfold, first signal, braking burn, first light) → operations or the crewed flight, with events and anomalies to diagnose from telemetry | Phase D and E: test as you fly, operations, risk |
 | 6 | Report | Score, requirement verification, charts, *why it worked or failed*, three suggestions | Cause and effect |
 | 7 | Iterate | Back to the desks with the report beside them; compare runs; save and share | Design is iterative |
 
@@ -185,7 +187,15 @@ management reserve.
 
 ## 6. Simulation and random events
 
-The run is seeded, and the same seed and design always replay identically.
+The run is seeded, and the same seed and design always replay identically. Since 14 November the flight has hands-on **steps** (an action with one button, owned by a role) besides **decisions**; the model is in `model/simulate.ts` and the events in `model/events.ts`.
+
+**Hidden flaws and the test campaign.** Each build hides flaws drawn from the seed through their own sequence (`model/tests.ts`): structure, thermal, deployment, radio compatibility, software, and for a crew the abort system and life support. Each planned test is a step its owner runs; it finds the flaw of its kind (fix it for weeks and money, or fly with it). A flaw nobody tested for, or one waived, shows up after launch: a bracket breaks during ascent, a wing sticks, the ground cannot read the spacecraft, the battery runs hot, the computer keeps restarting, the CO₂ scrubber fades. Guided, Cadet and Sandbox builds hide no flaws.
+
+**Anomalies.** Two or three per flight on Engineer and above, scheduled from the seed. Each shows three or four telemetry channels; one hidden cause explains them all. The matching fix costs a day, a wrong guess costs days and leaves a scar (a tenth of the array, a damaged wheel, a slower link), and "safe mode and investigate" takes a week but always works.
+
+**A crewed flight** counts flight days: checkout in high Earth orbit, a go/no-go for the Moon (judged on the telemetry of the day), the flyby or the burns into and out of lunar orbit, supplies, radiation (cosmic rays every day, a solar storm once), crew anomalies (CO₂, a cabin leak, the toilet) and a splashdown that weather can delay. A heat shield built for low orbit, an escape system that fails or supplies that run out lose the crew, and then nothing else counts.
+
+The older description follows.
 
 **Phases:**
 1. Development (schedule slips, test findings).
@@ -307,3 +317,12 @@ src/studio/three/   React Three Fiber: the spacecraft, built from the design
 src/studio/net/     the room client (Server-Sent Events plus POST)
 server/             the game's own server: the built files and the rooms
 ```
+
+## 11. Since 14 November: guide, gauges, sound
+
+- **Guided level** (`ui/help.tsx`): the coach's steps (`model/coach.ts`) also name the section of the desk to open; the guide draws a light on the exact button (desk, section, then the suggested card) and marks a choice from the mission's reference design as "Suggested". No AI: the same checks the coach runs.
+- **Sweet spots** (`gaugeOf` in `model/analyze.ts`): mass, power, budget, data, comms and time each get a gauge from too little to just right to more than needed, with why each end is a problem.
+- **The change you just made** (`state.ts` → `focus`): the part a change touched lights up in 3D and the camera flies to it; parts inside the body show through an x-ray.
+- **Sound** (`ui/sound.ts`): Web Audio tones and noise, no files; every button taps, cards bolt on, tests shake and hiss, the launch rumbles, alarms sound for anomalies. One switch mutes it.
+- **Team roles**: a who-does-what grid on the setup screen and in the lobby; roles are shared out as players join until someone picks by hand; on one screen, opening a desk or reaching a step hands the controls to its owner. Online rooms can live on Render while the game is served from Vercel (`VITE_ROOMS_URL`, CORS on `/api`).
+- **Hangar** (`ui/Hangar.tsx`): saved designs for the mission, open, delete, compare two or three side by side.

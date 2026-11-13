@@ -117,3 +117,49 @@ export const habNeedM3 = (days: number) => 1.6 + 0.03 * days;
 
 /** Mission-control call signs, for the flight log of a crewed mission. */
 export const CALL_SIGNS = { director: 'FLIGHT', spacecraft: 'EECOM', science: 'SURGEON', comms: 'CAPCOM', resources: 'PROGRAM' } as const;
+
+// ------------------------------------------------------------------ the trip
+export type CrewOrbitId = 'freeReturn' | 'crewDro' | 'crewNrho' | 'crewLlo';
+
+/** How long each trajectory takes, how long it stays at the Moon, and what its burns cost (m/s). */
+export const CREW_TRIPS: Record<CrewOrbitId, Sourced & { days: number; moonDays: number; outboundDays: number; orbit: boolean; closestKm: number; inMs: number; outMs: number; trimMs: number }> = {
+  freeReturn: {
+    days: 10, moonDays: 1, outboundDays: 5, orbit: false, closestKm: 6_500, inMs: 0, outMs: 0, trimMs: 60,
+    source: 'Artemis II (April 2026): about 10 days, passing some 6 500 km beyond the far side', estimate: false,
+  },
+  crewDro: {
+    days: 22, moonDays: 6, outboundDays: 8, orbit: true, closestKm: 64_000, inMs: 330, outMs: 470, trimMs: 60,
+    source: 'Artemis I (2022): 25.5 days, 6 of them in a distant retrograde orbit, about 850 m/s of burns in all', estimate: true,
+  },
+  crewNrho: {
+    days: 30, moonDays: 12, outboundDays: 9, orbit: true, closestKm: 3_000, inMs: 430, outMs: 430, trimMs: 60,
+    source: 'NASA Gateway orbit studies: roughly 840–900 m/s for Orion to enter and leave the near-rectilinear halo orbit', estimate: true,
+  },
+  crewLlo: {
+    days: 12, moonDays: 3, outboundDays: 4, orbit: true, closestKm: 100, inMs: 900, outMs: 950, trimMs: 60,
+    source: 'Apollo: about 890 m/s into a 110 km orbit and 1 000 m/s back out', estimate: true,
+  },
+};
+
+/** What the analysis works out for a crewed design; the flight starts from it. */
+export interface CrewPlan {
+  callSign: string;
+  size: number;
+  days: number;
+  moonDays: number;
+  outboundDays: number;
+  /** Stops at the Moon (two big burns) rather than swinging past. */
+  orbit: boolean;
+  inMs: number;
+  outMs: number;
+  /** Days of air, water and food on board. */
+  supplyDays: number;
+  marginDays: number;
+  /** Planning dose: cosmic rays for the whole trip plus one large solar storm in the shelter (mSv). */
+  doseMsv: number;
+  cabinM3: number;
+  cabinNeedM3: number;
+  /** Chance the escape system saves the crew from a failing rocket. */
+  abortSaves: number;
+  shieldOk: boolean;
+}

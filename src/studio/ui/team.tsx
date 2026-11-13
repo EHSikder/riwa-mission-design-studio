@@ -10,6 +10,7 @@ import {
   type AllocDesk, type Allocation, type Teamwork,
 } from '../model/team';
 import { ROLES, type RoleId } from '../model/types';
+import type { Player } from '../model/team';
 import { lanAddresses } from '../net/room';
 import { useStudio } from '../state';
 import { Lines, StatusBadge, fmt } from './controls';
@@ -18,12 +19,15 @@ import { Lines, StatusBadge, fmt } from './controls';
 
 export type PlayMode = 'solo' | 'hotseat' | 'host';
 
-export function TeamPicker(props: { mode: PlayMode; setMode: (m: PlayMode) => void; names: string[]; setNames: (n: string[]) => void; rooms: boolean | null }) {
-  const { mode, names, rooms } = props;
+export function TeamPicker(props: {
+  mode: PlayMode; setMode: (m: PlayMode) => void; names: string[]; setNames: (n: string[]) => void; rooms: boolean | null;
+  roles: Record<RoleId, string>; setRoles: (r: Record<RoleId, string>) => void; seats: Player[];
+}) {
+  const { mode, names, rooms, roles, seats } = props;
   const modes: { id: PlayMode; title: string; text: string }[] = [
-    { id: 'solo', title: 'Solo', text: 'You hold all five roles and switch desks with the tabs.' },
-    { id: 'hotseat', title: 'Team on this screen', text: '2–4 players share one computer and pass the keyboard.' },
-    { id: 'host', title: 'Host a network room', text: 'Teammates join from their own computers, each at their own desk.' },
+    { id: 'solo', title: 'Solo', text: 'You hold all five roles and open each desk yourself.' },
+    { id: 'hotseat', title: 'Team on one screen', text: '2–4 players around one laptop or a big screen. Each desk has an owner; when you open a desk, the controls go to its owner.' },
+    { id: 'host', title: 'Team online', text: 'Each player on their own computer, anywhere. You open a room and share its 4-letter code.' },
   ];
   return (
     <div className="st-who">
@@ -35,18 +39,21 @@ export function TeamPicker(props: { mode: PlayMode; setMode: (m: PlayMode) => vo
           </button>
         ))}
       </div>
-      {rooms === false && <p className="st-sub">This copy of the game has no room server, so network rooms are off here. “Team on this screen” works. To play across computers, one laptop runs the game with <code>npm run lan</code>.</p>}
+      {rooms === false && <p className="st-sub">This copy of the game has no room server, so online rooms are off here. Use the game's Render link for online play, or “Team on one screen”.</p>}
       {mode === 'hotseat' && (
-        <div className="st-names">
-          {names.map((n, i) => (
-            <label key={i} className="st-name-field">
-              <span className="st-dot" style={{ background: PLAYER_COLORS[i] }} />
-              <input value={n} placeholder={`Player ${i + 1}`} aria-label={`Player ${i + 1} name`} onChange={(e) => props.setNames(names.map((x, k) => (k === i ? e.target.value : x)))} />
-              {names.length > 2 && <button type="button" className="st-ghost" onClick={() => props.setNames(names.filter((_, k) => k !== i))} aria-label={`Remove player ${i + 1}`}>✕</button>}
-            </label>
-          ))}
-          {names.length < MAX_PLAYERS && <button type="button" className="st-link" onClick={() => props.setNames([...names, ''])}>+ Add a player</button>}
-        </div>
+        <>
+          <div className="st-names">
+            {names.map((n, i) => (
+              <label key={i} className="st-name-field">
+                <span className="st-dot" style={{ background: PLAYER_COLORS[i] }} />
+                <input value={n} placeholder={`Player ${i + 1}`} aria-label={`Player ${i + 1} name`} onChange={(e) => props.setNames(names.map((x, k) => (k === i ? e.target.value : x)))} />
+                {names.length > 2 && <button type="button" className="st-ghost" onClick={() => props.setNames(names.filter((_, k) => k !== i))} aria-label={`Remove player ${i + 1}`}>✕</button>}
+              </label>
+            ))}
+            {names.length < MAX_PLAYERS && <button type="button" className="st-link" onClick={() => props.setNames([...names, ''])}>+ Add a player</button>}
+          </div>
+          <RoleGrid players={seats} roles={roles} onPick={(r, id) => props.setRoles({ ...roles, [r]: id })} />
+        </>
       )}
       {mode === 'host' && (
         <div className="st-names">
@@ -56,7 +63,64 @@ export function TeamPicker(props: { mode: PlayMode; setMode: (m: PlayMode) => vo
           </label>
         </div>
       )}
+      {mode !== 'solo' && <HowWePlay />}
     </div>
+  );
+}
+
+/** Who does what: one row per role, one column per player. Shared out already; a click moves a role. */
+export function RoleGrid({ players, roles, onPick, canPick = () => true }: { players: Player[]; roles: Record<RoleId, string>; onPick: (r: RoleId, player: string) => void; canPick?: (r: RoleId) => boolean }) {
+  return (
+    <div className="st-rolegrid" role="table" aria-label="Who handles which role">
+      <div className="st-rolegrid-row head" role="row" style={{ gridTemplateColumns: `minmax(0, 1fr) repeat(${players.length}, 92px)` }}>
+        <span role="columnheader">Role</span>
+        {players.map((p) => <span key={p.id} role="columnheader" style={{ color: p.color }}>{p.name}</span>)}
+      </div>
+      {ROLE_IDS.map((r) => (
+        <div key={r} className="st-rolegrid-row" role="row" style={{ gridTemplateColumns: `minmax(0, 1fr) repeat(${players.length}, 92px)` }}>
+          <span role="rowheader"><span className={`st-role-chip ${r}`}>{ROLES[r].short}</span><span className="st-dim">{ROLES[r].explain}</span></span>
+          {players.map((p) => (
+            <span key={p.id} role="cell">
+              <button
+                type="button"
+                className={`st-rolegrid-pick ${roles[r] === p.id ? 'on' : ''}`}
+                style={{ ['--pc' as string]: p.color }}
+                aria-pressed={roles[r] === p.id}
+                aria-label={`${p.name} handles ${ROLES[r].name}`}
+                disabled={!canPick(r)}
+                onClick={() => onPick(r, p.id)}
+              >
+                {roles[r] === p.id ? '●' : ''}
+              </button>
+            </span>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** The three ways to play together, in plain words. */
+export function HowWePlay() {
+  return (
+    <details className="st-howplay" open>
+      <summary>How playing together works</summary>
+      <div className="st-howplay-grid">
+        <div>
+          <b>On one screen</b>
+          <p>One laptop (or a laptop plugged into a TV), everyone around it. Each role has an owner, shown on its desk button. Open a desk and the controls go to its owner. Hands-on steps in flight go to their owner too; decisions are a quick vote round the table.</p>
+        </div>
+        <div>
+          <b>Online, each on their own computer</b>
+          <p>Open the game's Render link (the one ending in <code>onrender.com</code>) and choose Team online. Share the 4-letter room code or the link it shows. Works from anywhere with internet. The free server sleeps when nobody uses it: the first visit wakes it in about a minute.</p>
+        </div>
+        <div>
+          <b>Same room, no internet</b>
+          <p>One laptop runs <code>npm run lan</code> from the game's folder. Everyone on the same Wi-Fi opens the address it prints. Same rooms and codes as online.</p>
+        </div>
+      </div>
+      <p className="st-sub">Roles are shared out for you. Change who does what in the grid (one click moves a role); one player can hold several. The Mission Director breaks ties and can launch without a unanimous GO, at a cost in teamwork points.</p>
+    </details>
   );
 }
 
@@ -91,22 +155,19 @@ export function Lobby() {
           </ul>
         </section>
         <section className="st-card-panel">
-          <h3>Roles <span className="st-sub">tap to take one; one player can hold several</span></h3>
-          <ul className="st-role-table">
-            {ROLE_IDS.map((r) => {
-              const o = ownerOf(team, r);
-              return (
-                <li key={r}>
-                  <span className={`st-role-chip ${r}`}>{ROLES[r].short}</span>
-                  <span className="st-role-text">{ROLES[r].explain}</span>
-                  <span className="st-role-owner" style={{ color: o?.color }}>{o?.name ?? '—'}</span>
-                  <button type="button" disabled={!me || team.roles[r] === me} onClick={() => me && teamOp({ t: 'claim', role: r, player: me })}>Take</button>
-                </li>
-              );
-            })}
-          </ul>
+          <h3>Who does what <span className="st-sub">shared out as players join; {me === host?.id ? 'you can move any role' : 'click in your own column to take a role'}</span></h3>
+          <RoleGrid
+            players={team.players}
+            roles={team.roles}
+            canPick={() => !!me}
+            onPick={(r, id) => {
+              // the host places anyone; a player can only take a role for themselves
+              if (me === host?.id || id === me) teamOp({ t: 'claim', role: r, player: id });
+            }}
+          />
         </section>
       </div>
+      <HowWePlay />
       <div className="st-lobby-go">
         <button type="button" className="st-ghost big" onClick={exit}>← Leave the room</button>
         <button type="button" className="st-primary big" disabled={!scenario || !everyone || me !== host?.id} onClick={() => setPhase('brief')}>
@@ -321,9 +382,9 @@ export function GoPoll({ a }: { a: Analysis }) {
         })}
       </ul>
       <div className="st-poll-launch">
-        <button type="button" className="st-primary big" disabled={!allGo || !director} onClick={() => fly()}>{allGo ? 'Launch the mission' : 'Waiting for every GO'}</button>
+        <button type="button" className="st-primary big" data-guide="go-fly-main" data-sfx="go" disabled={!allGo || !director} onClick={() => fly()}>{allGo ? 'Build and fly →' : 'Waiting for every GO'}</button>
         {director && !allGo && (
-          <button type="button" onClick={() => { teamOp({ t: 'override' }); fly(); }} title="Launch without a unanimous GO: it costs teamwork points">
+          <button type="button" data-guide="go-fly" onClick={() => { teamOp({ t: 'override' }); fly(); }} title="Launch without a unanimous GO: it costs teamwork points">
             Director: launch anyway
           </button>
         )}

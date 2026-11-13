@@ -7,7 +7,7 @@
 import type { BodyId, Sourced } from './types';
 
 // ------------------------------------------------------------------ platforms (structure)
-export type PlatformId = 'cube6u' | 'cube12u' | 'micro' | 'small' | 'medium' | 'large';
+export type PlatformId = 'none' | 'cube6u' | 'cube12u' | 'micro' | 'small' | 'medium' | 'large' | 'capsule3' | 'capsule4' | 'capsuleHab';
 
 export interface Platform extends Sourced {
   name: string;
@@ -32,9 +32,18 @@ export interface Platform extends Sourced {
   /** Body size (m): width, depth, height. For drag, body-mounted cells and the 3D model. */
   size: [number, number, number];
   cubesat: boolean;
+  /** Crew capsules: seats and the room to live in (m³). */
+  crew?: { seats: number; habM3: number };
 }
 
 export const PLATFORMS: Record<PlatformId, Platform> = {
+  // nothing on the assembly stand yet: every design starts here
+  none: {
+    name: 'No structure yet', short: 'no', cubesat: false, explain: '',
+    structureKg: 0, maxMassKg: 0, slots: 0, maxPayloadKg: 0, maxArrayM2: 0, maxDishM: 0, housekeepingW: 0,
+    costM: 0, devMonths: 0, aitMonths: 0, size: [0.6, 0.6, 0.6],
+    source: '—', estimate: false,
+  },
   cube6u: {
     name: '6U CubeSat', short: '6U', cubesat: true,
     explain: 'A standard box the size of a cereal packet. Very cheap and quick, but there is little room for instruments, power or antennas.',
@@ -76,6 +85,28 @@ export const PLATFORMS: Record<PlatformId, Platform> = {
     structureKg: 550, maxMassKg: 6_500, slots: 8, maxPayloadKg: 1_400, maxArrayM2: 80, maxDishM: 3.5, housekeepingW: 350,
     costM: 45, devMonths: 34, aitMonths: 12, size: [2.4, 2.9, 5],
     source: 'Typical GEO buses (Eurostar / SSL-1300 class, 3–6.5 t); estimates', estimate: true,
+  },
+  // crew capsules: the pressure cabin, heat shield and parachutes, on a service module with the engine and tanks
+  capsule3: {
+    name: 'Compact capsule (3 seats)', short: 'Compact capsule', cubesat: false, crew: { seats: 3, habM3: 5.5 },
+    explain: 'A small cabin on a small service module, in the spirit of Apollo: light enough for big manoeuvres, but three people share the space of a family car.',
+    structureKg: 8_600, maxMassKg: 22_000, slots: 2, maxPayloadKg: 250, maxArrayM2: 30, maxDishM: 1.2, housekeepingW: 1_300,
+    costM: 780, devMonths: 36, aitMonths: 10, size: [3.9, 3.9, 6.4],
+    source: 'Apollo command module (6.2 m³ habitable, 3 crew) on a modern service module; masses and cost are estimates', estimate: true,
+  },
+  capsule4: {
+    name: 'Deep-space capsule (4 seats)', short: 'Deep-space capsule', cubesat: false, crew: { seats: 4, habM3: 9 },
+    explain: 'Orion\'s class: four seats, about 9 m³ to live in, and a service module with four solar wings and a 26 kN engine.',
+    structureKg: 14_300, maxMassKg: 28_000, slots: 3, maxPayloadKg: 450, maxArrayM2: 45, maxDishM: 1.5, housekeepingW: 2_200,
+    costM: 1_300, devMonths: 40, aitMonths: 12, size: [5, 5, 7.3],
+    source: 'NASA Orion: crew module ~10.4 t, 8.9–9.3 m³ habitable, 4 crew for 21 days; with the European Service Module ~26.5 t at launch. Cost from NASA OIG ($1B Orion + $0.3B service module); the split of dry masses is an estimate', estimate: true,
+  },
+  capsuleHab: {
+    name: 'Capsule with a habitat module (4 seats)', short: 'Capsule + habitat', cubesat: false, crew: { seats: 4, habM3: 24 },
+    explain: 'The same capsule with an extra room bolted on: space to stand up, exercise and work for a month. It weighs as much as it sounds.',
+    structureKg: 19_500, maxMassKg: 36_000, slots: 5, maxPayloadKg: 900, maxArrayM2: 60, maxDishM: 2, housekeepingW: 3_000,
+    costM: 1_900, devMonths: 48, aitMonths: 14, size: [5, 5, 10.5],
+    source: 'A capsule plus a small logistics-and-habitation module (Gateway HALO class, scaled down); estimates', estimate: true,
   },
 };
 
@@ -152,7 +183,7 @@ export const pcduKg = (arrayW: number) => 0.2 + 0.012 * arrayW;
 export const pcduCostM = (arrayW: number) => 0.05 + 0.0012 * arrayW;
 
 // ------------------------------------------------------------------ onboard computer and storage
-export type ComputerId = 'cots' | 'radTolerant' | 'radHard' | 'edge';
+export type ComputerId = 'none' | 'cots' | 'radTolerant' | 'radHard' | 'edge';
 
 export interface Computer extends Sourced {
   name: string;
@@ -169,6 +200,11 @@ export interface Computer extends Sourced {
 }
 
 export const COMPUTERS: Record<ComputerId, Computer> = {
+  none: {
+    name: 'No computer yet', explain: '',
+    massKg: 0, powerW: 0, costM: 0, toleranceKrad: 0, failPerYear: 0, devMonths: 0, dataReduction: 0,
+    source: '—', estimate: false,
+  },
   cots: {
     name: 'Commercial computer', explain: 'A phone-class processor: cheap, light and fast, but radiation can upset or kill it. Fine for short missions in low orbit.',
     massKg: 0.5, powerW: 4, costM: 0.1, toleranceKrad: 10, failPerYear: 0.05, devMonths: 4, dataReduction: 0,
@@ -192,12 +228,13 @@ export const COMPUTERS: Record<ComputerId, Computer> = {
 };
 
 export const STORAGE_STEPS_GBIT = [8, 32, 128, 512, 2_048, 8_192] as const;
-export const storageKg = (gbit: number) => 0.1 + 0.0004 * gbit;
-export const storageW = (gbit: number) => 1 + 0.0015 * gbit;
-export const storageCostM = (gbit: number) => 0.03 + 0.000_25 * gbit;
+// zero storage is "not fitted yet": it weighs and costs nothing
+export const storageKg = (gbit: number) => (gbit > 0 ? 0.1 + 0.0004 * gbit : 0);
+export const storageW = (gbit: number) => (gbit > 0 ? 1 + 0.0015 * gbit : 0);
+export const storageCostM = (gbit: number) => (gbit > 0 ? 0.03 + 0.000_25 * gbit : 0);
 
 // ------------------------------------------------------------------ attitude control
-export type AdcsId = 'magnetorquer' | 'wheels' | 'agile';
+export type AdcsId = 'none' | 'magnetorquer' | 'wheels' | 'agile';
 
 export interface Adcs extends Sourced {
   name: string;
@@ -215,6 +252,12 @@ export interface Adcs extends Sourced {
 }
 
 export const ADCS: Record<AdcsId, Adcs> = {
+  none: {
+    name: 'No attitude control yet', explain: '',
+    accuracyDeg: 180, offNadirDeg: 0, needsMagneticField: false,
+    massKg: () => 0, powerW: () => 0, costM: () => 0, failPerYear: 0, devMonths: 0,
+    source: '—', estimate: false,
+  },
   magnetorquer: {
     name: 'Magnetorquers + sun sensors', explain: 'Electromagnets push against Earth\'s magnetic field. Cheap and simple, but only points to ~5°, and does not work far from Earth.',
     accuracyDeg: 5, offNadirDeg: 0, needsMagneticField: true,
@@ -308,9 +351,11 @@ export const BANDS: Record<BandId, Band> = {
   Ka: { name: 'Ka-band (27 GHz)', explain: 'Very high rates and small antennas, but rain absorbs it: tropical storms can cut the link.', freqHz: 27e9, capMbps: 3_000, atmLossDb: 1.5, ampEfficiency: 0.25 },
 };
 
-export type AntennaId = 'patch' | 'helix' | 'dish';
+export type AntennaId = 'none' | 'patch' | 'helix' | 'dish';
 
 export const ANTENNAS: Record<AntennaId, { name: string; explain: string; gainDbi?: number; massKg: (d: number) => number; costM: (d: number) => number }> = {
+  // no radio fitted: a gain so low that no link closes
+  none: { name: 'No antenna yet', explain: 'Without an antenna and a radio the spacecraft is mute.', gainDbi: -300, massKg: () => 0, costM: () => 0 },
   patch: { name: 'Patch (low gain)', explain: 'A small flat antenna with a wide beam: no pointing needed, but weak.', gainDbi: 5, massKg: () => 0.1, costM: () => 0.02 },
   helix: { name: 'Shaped beam (medium gain)', explain: 'A helix or isoflux antenna that focuses the beam toward Earth without having to aim it precisely.', gainDbi: 12, massKg: () => 0.6, costM: () => 0.1 },
   dish: { name: 'Dish (high gain)', explain: 'A parabolic dish: the bigger it is, the narrower and stronger the beam, but the spacecraft must point it precisely.', massKg: (d) => 1.5 + 3 * d * d, costM: (d) => 0.3 + 1.5 * d * d },
@@ -380,7 +425,7 @@ export const STATIONS: Record<StationId, Station> = {
 
 // ------------------------------------------------------------------ launchers
 export type LaunchTarget = 'leo' | 'sso' | 'gto' | 'tli' | 'mars';
-export type LauncherId = 'rideshare' | 'electron' | 'pslv' | 'vegac' | 'falcon9' | 'falcon9x' | 'ariane62' | 'ariane64' | 'falconHeavy';
+export type LauncherId = 'none' | 'rideshare' | 'electron' | 'pslv' | 'vegac' | 'falcon9' | 'falcon9x' | 'ariane62' | 'ariane64' | 'falconHeavy' | 'sls';
 
 export interface Launcher extends Sourced {
   name: string;
@@ -398,9 +443,16 @@ export interface Launcher extends Sourced {
   fairingM: number;
   /** A shared ride: price per kg, a minimum, and the only orbit it goes to. */
   rideshare?: { pricePerKgM: number; minPriceM: number; maxKg: number; altKm: [number, number]; ltanH: [number, number] };
+  /** Certified to carry people. */
+  crewRated?: boolean;
 }
 
 export const LAUNCHERS: Record<LauncherId, Launcher> = {
+  none: {
+    name: 'No launcher yet', provider: '—', explain: '',
+    costM: 0, reliability: 0, capacityKg: {}, altLossPer100Km: 0, fairingM: 99,
+    source: '—', estimate: false,
+  },
   rideshare: {
     name: 'Rideshare (shared SSO launch)', provider: 'SpaceX Transporter class',
     explain: 'Buy a seat on a rocket carrying dozens of small satellites. Very cheap, but it goes where it goes: about 525 km, late-morning sun-synchronous.',
@@ -456,10 +508,16 @@ export const LAUNCHERS: Record<LauncherId, Launcher> = {
     costM: 150, reliability: 0.98, capacityKg: { leo: 63_800, gto: 26_700, tli: 16_000, mars: 16_800 }, altLossPer100Km: 0.02, gtoIncDeg: 27, fairingM: 4.6,
     source: 'SpaceX (63.8 t LEO, 26.7 t GTO, 16.8 t Mars); price and TLI are estimates', estimate: true,
   },
+  sls: {
+    name: 'Space Launch System (Block 1)', provider: 'NASA', crewRated: true,
+    explain: 'NASA\'s Moon rocket, the one that flew Artemis II: the only launcher certified to send a crew to the Moon. It throws 27 t toward the Moon, at a price to match.',
+    costM: 2_200, reliability: 0.98, capacityKg: { tli: 27_000 }, altLossPer100Km: 0, fairingM: 8.4,
+    source: 'NASA: more than 27 t to the Moon (Block 1). Price: NASA OIG puts one Artemis launch at $4.1B, about $2.2B of it the rocket; reliability is an estimate', estimate: true,
+  },
 };
 
 // ------------------------------------------------------------------ orbit types
-export type OrbitTypeId = 'sso' | 'leo' | 'geo' | 'llo' | 'elfo' | 'halo' | 'marsLow' | 'marsHigh';
+export type OrbitTypeId = 'sso' | 'leo' | 'geo' | 'llo' | 'elfo' | 'halo' | 'marsLow' | 'marsHigh' | 'freeReturn' | 'crewDro' | 'crewNrho' | 'crewLlo';
 
 export interface OrbitType {
   name: string;
@@ -524,5 +582,30 @@ export const ORBIT_TYPES: Record<OrbitTypeId, OrbitType> = {
     explain: 'A long ellipse, ~300 km at the low point and 33 000 km at the high point, one lap per Mars day.',
     goodFor: 'Cheap to enter (~0.9 km/s); whole-disc views of the weather.',
     badFor: 'Only close to the planet for minutes per lap: little high-resolution mapping.',
+  },
+  // crewed trips around the Moon: the launcher's upper stage does the push out of Earth orbit
+  freeReturn: {
+    name: 'Lunar flyby (free return)', short: 'Flyby', body: 'moon', target: 'tli',
+    explain: 'A figure of eight around the far side and straight home in about ten days. The Moon\'s gravity bends the path back to Earth, so even with a dead engine the crew comes home. Artemis II flew this.',
+    goodFor: 'Safety: the engine only has to make small corrections.',
+    badFor: 'A single day near the Moon, most of it thousands of kilometres up.',
+  },
+  crewDro: {
+    name: 'High lunar orbit (6 days at the Moon)', short: 'High orbit', body: 'moon', target: 'tli',
+    explain: 'A wide, stable orbit tens of thousands of kilometres above the Moon, the one Artemis I tested. Getting in and out takes two engine burns each way.',
+    goodFor: 'Days of lunar science for less than half the propellant of a low orbit.',
+    badFor: 'The engine must work to come home, and the trip lasts three weeks.',
+  },
+  crewNrho: {
+    name: 'Gateway orbit (12 days at the Moon)', short: 'Gateway orbit', body: 'moon', target: 'tli',
+    explain: 'A week-long loop over the lunar poles (a near-rectilinear halo orbit) that always sees Earth: where the Gateway station is meant to fly.',
+    goodFor: 'Long stays with an unbroken link to Earth.',
+    badFor: 'A month away from home: a lot of air, water and food, and a lot of radiation.',
+  },
+  crewLlo: {
+    name: 'Low lunar orbit (3 days at 100 km)', short: 'Low orbit', body: 'moon', target: 'tli',
+    explain: 'Skimming 100 km above the surface, as Apollo did. Braking into it and climbing back out costs nearly 2 km/s.',
+    goodFor: 'The closest look at the Moon a crew can get without landing.',
+    badFor: 'Propellant: the tanks may weigh more than the launcher can lift.',
   },
 };
