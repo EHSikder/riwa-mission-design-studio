@@ -62,6 +62,16 @@ export interface ResourceSummary {
   critical: boolean;
   /** Where the value sits between too little and more than needed. */
   gauge?: Gauge;
+  /** What is wrong, each in a few words and why it matters; empty when it fits. */
+  problems: Problem[];
+}
+
+/** One thing wrong with a resource, as the dashboard says it when the resource is clicked. */
+export interface Problem {
+  title: string;
+  why: string;
+  /** A word or two for the value slot ("No launcher"), for problems the gauge cannot show. */
+  tag?: string;
 }
 
 /**
@@ -857,7 +867,7 @@ export function analyze(d: StudioDesign, difficulty: Difficulty = 'engineer'): A
   const massMargin = massLimit > 0 ? (massLimit - wetKg) / massLimit : 0;
   const critical = new Set(s.critical);
   const res = (id: ResourceId, v: number, limit: number, marginPct: number, status: Status, headline: string, why: string): ResourceSummary => ({
-    id, name: RESOURCES[id].name, value: v, limit, unit: RESOURCES[id].unit, marginPct, status, headline, why, critical: critical.has(id),
+    id, name: RESOURCES[id].name, value: v, limit, unit: RESOURCES[id].unit, marginPct, status, headline, why, critical: critical.has(id), problems: [],
   });
   const thin = difficulty === 'expert' ? 10 : 5;
   const relayProx = relays.length ? proxRate(relaySite, relays).best : 0;
@@ -940,7 +950,7 @@ export function analyze(d: StudioDesign, difficulty: Difficulty = 'engineer'): A
     over: 'Money left over is mission you did not buy: a better instrument, a goal-level requirement, more tests or a bigger reserve.',
   });
   if (!transponders.length && !(generated === 0 && relays.length) && generated > 0 && capacityDay > 0) resources.data.gauge = gaugeOf(spareData, 0, 100, -100, 500, {
-    label: 'Downlink to spare', value: pct(spareData), ideal: '0–100%',
+    label: 'Downlink to spare', value: spareData >= 1000 ? `${f0(capacityDay / generated)}× needed` : pct(spareData), ideal: '0–100%',
     source: "This game's rule. JPL sizes the data system at the point-design stage from the quantity, quality, continuity and latency the science needs.",
     under: 'The instruments make more than the link can send: the rest is lost, or never taken.',
     over: 'The link is far bigger than the instruments need. Transmitter power, antenna size and ground-station time are being paid for and not used.',
@@ -957,6 +967,75 @@ export function analyze(d: StudioDesign, difficulty: Difficulty = 'engineer'): A
     under: slack < 0 ? 'Late: the launch comes after the deadline.' : 'No room for a late part or a failed test.',
     over: 'A lot of slack: there was time for a more capable instrument, or for more tests.',
   });
+  // ---------------------------------------------------------------- each resource in a few words: what is wrong, and why it matters (the dashboard's notes)
+  const P = (title: string, why: string, tag?: string): Problem => ({ title, why, tag });
+  const zone = (r: ResourceSummary, under: Problem, over: Problem): Problem[] => (r.gauge?.zone === 'under' ? [under] : r.gauge?.zone === 'over' ? [over] : []);
+  resources.mass.problems = !has.structure
+    ? [P('No structure added', 'Every part bolts onto it, and it sets how much the spacecraft may weigh.', 'Not built')]
+    : [
+      // a missing or wrong rocket fails the mass check even when the platform could carry it
+      ...(!has.launcher
+        ? [P('No launcher chosen', 'Nothing can take the spacecraft to orbit yet, so its mass cannot be checked against a rocket.', 'No launcher')]
+        : reasons.filter((x) => !x.startsWith('Too heavy')).map((x) => P('The launcher does not fit', x, 'Launcher'))),
+      ...(!has.launcher && massMargin >= 0 ? [] : zone(resources.mass,
+        massMargin < 0 ? P('Too heavy', `${f0(wetKg)} kg is more than the ${limitBy === 'launcher' ? `${lv.name} can lift to this orbit` : `${p.short} platform can carry`} (${f0(massLimit)} kg).`) : P('Too little mass to spare', 'Every spacecraft gains weight while it is built: with this little to spare it will end up too heavy.'),
+        P('Too much spare lift', 'The spare kilograms could carry another instrument, or a smaller platform or rocket would cost less.'))),
+      ...(cheaper && !reasons.length && resources.mass.gauge?.zone !== 'over' ? [P('A cheaper rocket would do', `${LAUNCHERS[cheaper.id].name} could launch it for $${f1(cheaper.price)}M instead of $${f1(priceM)}M.`)] : []),
+    ];
+  resources.power.problems = !has.arrays
+    ? [P('No solar arrays added', 'Nothing makes electricity.', 'Not built')]
+    : [
+      ...(!has.battery ? [P('No battery added', te > 0 ? `Nothing keeps the spacecraft alive in each ${f0(te)}-minute shadow.` : 'Nothing keeps it alive if it loses the Sun.', 'No battery')]
+        : dod > 1 ? [P('Battery too small', `It runs flat in every ${f0(te)}-minute shadow.`, 'Battery')]
+        : dod > dodAllowed + 1e-9 ? [P('Battery drains too deep', `Each shadow uses ${f0(dod * 100)}% of it, so it wears out after ${f1(batteryLifeYears)} years.`, 'Battery')] : []),
+      ...zone(resources.power,
+        powerMargin < 0 ? P('Too little power', 'The arrays cannot cover what the spacecraft uses: instruments switch off.') : P('Too little power to spare', 'The arrays wear out: with this little to spare it runs short before the end.'),
+        P('Too much power', 'The extra array is mass, cost and drag that nothing uses.')),
+    ];
+  resources.budget.problems = zone(resources.budget,
+    P('Over budget', `It costs $${f1(totalM)}M; the customer has $${f0(budgetM)}M.`),
+    P('Too much money left', 'Unspent money is mission you did not buy: a better instrument, a goal or more tests.'))
+    .filter((x) => has.structure || x.title !== 'Too much money left');
+  if (!resources.budget.problems.length && resources.budget.status === 'warn') resources.budget.problems = [P('Little money to spare', 'One surprise and the mission is over budget.')];
+  const lost = !deep && lossPct > 0.5;
+  resources.data.problems = transponders.length
+    ? [
+      ...(geoCapacity < geoDemand ? [P('Too little capacity', `The transponders carry ${f2(geoCapacity)} Gbps; customers want ${f2(geoDemand)} Gbps.`, 'Capacity')] : []),
+      ...(powerFactor < 1 ? [P('Not enough power for every transponder', 'Some of them have to stay off.', 'Power')] : []),
+    ]
+    : generated === 0 && relays.length
+    ? relayProx <= 0 ? [P('Cannot hear the landers', "The relay's radio does not reach them.", 'No link')]
+      : rateWorst < relayProx ? [P('Link to Earth too slow', 'The landers send faster than the relay can pass on.', 'Slow link')] : []
+    : generated === 0
+    ? [P('No instruments added', 'Nothing makes data yet.', 'None')]
+    : !has.storage
+    ? [P('No storage added', 'Nothing holds the data between passes.', 'No storage')]
+    : [
+      ...(deep && capacityDay <= 0 ? [P('No link home', 'Nothing can send the data back to Earth.', 'No link')] : []),
+      ...(dataLimited ? [P('The link limits the science', 'The instruments could take more than the link can send.', 'Link')] : []),
+      ...(lost ? [P(`${f0(lossPct)}% of the data is lost`, capacityDay < generated ? 'The link cannot send it all.' : 'Storage fills up between passes and older data is overwritten.', `${f0(lossPct)}% lost`)]
+        : zone(resources.data, P('Too little downlink', 'The instruments make more than the link can send.'), P('Too much downlink', 'Transmitter power, antenna and station time are paid for and not used.'))),
+      ...(!lost && storageFactor < 1 ? [P('Storage too small', 'Some data is overwritten before it can be sent.', 'Storage')] : []),
+    ];
+  resources.comms.problems = !has.radio
+    ? [P('No radio added', 'Nothing can talk to the ground.', 'No radio')]
+    : d.stations.length === 0
+    ? [P(deep ? 'No deep-space antenna' : 'No ground station', 'Nobody on the ground is listening.', 'No station')]
+    : rateTyp <= 0
+    ? [P('No link', 'The signal is too weak to carry any data.', 'No link')]
+    : zone(resources.comms,
+      marginDb < 0 ? P('Signal too weak', 'At the farthest point the link drops out, more often in rain.') : P('Too little signal to spare', 'Rain or a low pass can break the link.'),
+      P('Too much signal', 'A smaller transmitter or antenna would save power and mass.'));
+  resources.time.problems = !has.structure
+    ? [P('Nothing to build yet', 'The slowest part sets when you can launch.', 'Not built')]
+    : [
+      ...(launchMonth > deadlineMonth ? [P('Too late', `Launch at month ${f0(launchMonth)}, after the deadline at month ${f0(deadlineMonth)}.`, 'Late')]
+        : zone(resources.time, P('Too little time to spare', 'A late part or a failed test would miss the launch.'), P('Too much time to spare', 'There was time for a better instrument or more tests.'))),
+      ...(lifetimeYears < years * 0.999 ? [P('Does not last the planned years', `It lasts ${f1(lifetimeYears)} years, limited by ${lifeLimiter.name.toLowerCase()}.`, 'Lifetime')] : []),
+    ];
+  // a warning or a failure always says what it is
+  for (const r of Object.values(resources)) if (!r.problems.length && (r.status === 'warn' || r.status === 'fail')) r.problems = [P(r.headline, r.why)];
+
   if (totalM > budgetM) issue('fail', 'resources', `$${f1(totalM)}M is over the $${f0(budgetM)}M budget.`, 'Cheaper parts, a smaller launcher, fewer years of operations, or a smaller reserve.', 'budget');
   if (!transponders.length && !deep && lossPct > 0.5 && has.radio && has.storage && d.stations.length > 0) issue(lossPct > 10 ? 'fail' : 'warn', 'comms', `${f0(lossPct)}% of the data never reaches the ground.`, capacityDay < generated ? 'A faster band, more transmitter power, a better antenna or more ground stations.' : 'More onboard storage to hold data between passes.', 'data');
   if (!has.arrays) issue('fail', 'spacecraft', 'No solar arrays yet: nothing makes electricity.', 'Add solar arrays on the Spacecraft desk.', 'power');

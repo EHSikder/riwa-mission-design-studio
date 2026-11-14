@@ -73,6 +73,7 @@ interface StudioState {
   /** The desk open on the left (none: the spacecraft gets the room), its open sections, the open panels on the right. */
   desk: RoleId | null;
   sections: Record<string, boolean>;
+  /** What is open on the right while designing (a panel, or a resource's note as "res:mass"); at most one. */
   folds: Record<string, boolean>;
   /** The part the last change touched. */
   focus: Focus | null;
@@ -285,7 +286,8 @@ export const useStudio = create<StudioState>((set, get) => {
     },
     toggleDesk: (r) => get().setDesk(get().desk === r ? null : r),
     openSection: (id, open) => set((s) => ({ sections: { ...s.sections, [id]: open ?? !s.sections[id] } })),
-    toggleFold: (id) => set((s) => ({ folds: { ...s.folds, [id]: !s.folds[id] } })),
+    // one thing open on the right at a time: opening a panel or a resource's note closes the other
+    toggleFold: (id) => set((s) => ({ folds: s.folds[id] ? {} : { [id]: true } })),
     edit: (role, change) => {
       const d = get().design;
       if (!d) return;

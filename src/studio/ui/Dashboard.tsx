@@ -1,13 +1,12 @@
 /**
- * The mission's six resources, its requirements and its problems (docs/03 §3). Each group is a button that opens
- * with a click; closed, it still shows how things stand at a glance. A resource has a sweet spot, not a "more is
- * better": its gauge shows too little, just right and more than needed, and says why each end is a problem.
+ * The mission's six resources, its requirements and its problems (docs/03 §3). The resources sit in one box that
+ * is always open; requirements and problems fold away. Only one thing on the right is open at a time. A resource
+ * has a sweet spot, not a "more is better": its bar's middle third is just right.
  */
-import { useState, type JSX } from 'react';
+import { useEffect, useRef, useState, type JSX } from 'react';
 import type { Analysis, Issue, ResourceSummary } from '../model/analyze';
 import { ROLES, type ResourceId } from '../model/types';
 import { useStudio } from '../state';
-import { GaugeBar, StatusBadge } from './controls';
 import { MetBadge } from './desks';
 
 const ICONS: Record<ResourceId, JSX.Element> = {
@@ -29,20 +28,44 @@ export function ResourceIcon({ id }: { id: ResourceId }) {
 
 export const RESOURCE_ORDER: ResourceId[] = ['mass', 'power', 'budget', 'data', 'comms', 'time'];
 
-function ResourceCard({ r }: { r: ResourceSummary }) {
-  const [open, setOpen] = useState(false);
+/**
+ * The six resources in one box, two to a row like a game's stat panel: a name, a value and a bar whose middle
+ * third is "just right". A click says what is wrong and why (or that it fits); one note is open at a time.
+ */
+/** The colour matches what a click says: red when it fails, yellow for anything else wrong (too little, too much), green when it fits. */
+const toneOf = (r: ResourceSummary) => (r.status === 'fail' ? 'fail' : r.problems.length ? 'warn' : 'good');
+
+function ResourceBox({ a }: { a: Analysis }) {
+  const open = useStudio((s) => Object.keys(s.folds).find((k) => s.folds[k] && k.startsWith('res:')));
+  const toggle = useStudio((s) => s.toggleFold);
+  const rs = RESOURCE_ORDER.map((id) => a.resources[id]);
+  const shown = rs.find((r) => open === `res:${r.id}`);
   return (
-    <button type="button" className={`st-res ${r.status} ${r.critical ? 'critical' : ''}`} onClick={() => setOpen(!open)} aria-expanded={open} data-sfx={open ? 'close' : 'open'}>
-      <span className="st-res-top">
-        <span className="st-res-icon"><ResourceIcon id={r.id} /></span>
-        <b>{r.name}</b>
-        {r.critical && <span className="st-crit" title="Critical for this mission">★</span>}
-        <StatusBadge status={r.status} />
-      </span>
-      <span className="st-res-head">{r.headline}</span>
-      {r.gauge ? <GaugeBar g={r.gauge} open={open} /> : null}
-      {open && <span className="st-res-why">{r.why}</span>}
-    </button>
+    <section className="st-stats" aria-label="Resources">
+      <div className="st-stats-grid">
+        {rs.map((r) => {
+          // a problem the bar cannot show (nothing built, no launcher) takes the value's place, and the bar stays empty
+          const tag = r.problems.find((p) => p.tag)?.tag;
+          const on = open === `res:${r.id}`;
+          return (
+            <button key={r.id} type="button" className={`st-stat ${toneOf(r)} ${on ? 'on' : ''}`} aria-expanded={on} data-sfx={on ? 'close' : 'open'} onClick={() => toggle(`res:${r.id}`)}>
+              <span className="st-stat-row">
+                <b>{r.name}{r.critical && <i title="Critical for this mission">★</i>}</b>
+                <em>{tag ?? r.gauge?.value ?? '—'}</em>
+              </span>
+              <span className="st-stat-bar" aria-hidden><span style={{ width: `${(!tag && r.gauge ? r.gauge.pos : 0) * 100}%` }} /></span>
+            </button>
+          );
+        })}
+      </div>
+      {shown && (
+        <div className={`st-stat-note ${toneOf(shown)} st-reveal-fast`} role="status">
+          {shown.problems.length
+            ? shown.problems.map((p) => <p key={p.title}><b>{p.title}.</b> {p.why}</p>)
+            : <p><b>Fits well.</b></p>}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -72,18 +95,43 @@ export function IssueList({ issues, limit }: { issues: Issue[]; limit?: number }
   );
 }
 
-function ReqRow({ r }: { r: Analysis['requirements'][number] }) {
-  const [open, setOpen] = useState(false);
+/** A requirement: a cut-off name shows in full in a small tip while the pointer is on it, or for a few seconds after a tap. */
+function ReqRow({ r, open, onOpen }: { r: Analysis['requirements'][number]; open: boolean; onOpen: () => void }) {
+  const label = useRef<HTMLSpanElement>(null);
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const [tip, setTip] = useState(false);
+  const cut = () => !!label.current && label.current.scrollWidth > label.current.clientWidth + 1;
+  useEffect(() => () => clearTimeout(timer.current), []);
   return (
     <li className={`st-reqmini ${r.met}`}>
-      <button type="button" onClick={() => setOpen(!open)} aria-expanded={open}>
-        <span className="st-reqmini-label">{r.req.label}</span>
+      <button
+        type="button"
+        onClick={onOpen}
+        aria-expanded={open}
+        onPointerEnter={(e) => { if (e.pointerType === 'mouse') setTip(cut()); }}
+        onPointerLeave={(e) => { if (e.pointerType === 'mouse') setTip(false); }}
+        onPointerUp={(e) => {
+          if (e.pointerType === 'mouse') return;
+          setTip(cut());
+          clearTimeout(timer.current);
+          timer.current = setTimeout(() => setTip(false), 3000);
+        }}
+        onFocus={() => setTip(cut())}
+        onBlur={() => setTip(false)}
+      >
+        <span className="st-reqmini-label" ref={label}>{r.req.label}</span>
         <span className="st-reqmini-val">{r.display}</span>
         <MetBadge met={r.met} level={r.level} />
       </button>
+      {tip && <span className="st-tip" role="tooltip">{r.req.label}</span>}
       {open && <span className="st-res-why">{r.why}</span>}
     </li>
   );
+}
+
+function RequirementList({ a }: { a: Analysis }) {
+  const [open, setOpen] = useState<string | null>(null);
+  return <ul className="st-reqmini-list">{a.requirements.map((r) => <ReqRow key={r.req.id} r={r} open={open === r.req.id} onOpen={() => setOpen(open === r.req.id ? null : r.req.id)} />)}</ul>;
 }
 
 /** A panel on the right that opens and closes; its summary shows while closed. */
@@ -106,22 +154,11 @@ export function Dashboard({ a }: { a: Analysis }) {
   const fails = a.issues.filter((i) => i.level === 'fail').length;
   const warns = a.issues.filter((i) => i.level === 'warn').length;
   const met = a.requirements.filter((r) => r.met !== 'fail').length;
-  const rs = RESOURCE_ORDER.map((id) => a.resources[id]);
   return (
     <div className="st-dash">
-      <Fold
-        id="resources"
-        title="Resources"
-        summary={
-          <span className="st-res-dots">
-            {rs.map((r) => <span key={r.id} className={`st-res-dot ${r.status}`} title={`${r.name}: ${r.headline}`}><ResourceIcon id={r.id} /></span>)}
-          </span>
-        }
-      >
-        <div className="st-res-grid">{rs.map((r) => <ResourceCard key={r.id} r={r} />)}</div>
-      </Fold>
+      <ResourceBox a={a} />
       <Fold id="requirements" title="Requirements" summary={<span className={met === a.requirements.length ? 'st-ok' : 'st-bad'}>{met} of {a.requirements.length} met</span>}>
-        <ul className="st-reqmini-list">{a.requirements.map((r) => <ReqRow key={r.req.id} r={r} />)}</ul>
+        <RequirementList a={a} />
       </Fold>
       <Fold id="problems" title="Problems" summary={<span className={fails ? 'st-bad' : warns ? 'st-warnword' : 'st-ok'}>{fails ? `${fails} blocking` : 'none blocking'}{warns ? ` · ${warns} warnings` : ''}</span>}>
         <IssueList issues={a.issues} />

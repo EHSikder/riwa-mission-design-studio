@@ -264,23 +264,9 @@
 .st-craft-none { display: flex; align-items: center; justify-content: center; height: 100%; padding: 24px; text-align: center; color: var(--st-muted); }
 /* ------------------------------------------------------------ dashboard */
 .st-dash h3:first-child { margin-top: 14px; }
-.st-res-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-.studio .st-res { display: flex; flex-direction: column; gap: 4px; text-align: left; padding: 9px 11px; border-radius: 16px; background: var(--st-panel2); border-color: var(--st-line); border-left: 3px solid var(--st-line2); }
-.studio .st-res.good { border-left-color: var(--st-good); }
-.studio .st-res.warn { border-left-color: var(--st-warn); }
-.studio .st-res.fail { border-left-color: var(--st-fail); background: rgba(229, 56, 59, 0.08); }
-.studio .st-res.over { border-left-color: var(--st-over); }
-.studio .st-res.critical { box-shadow: inset 0 0 0 1px rgba(96, 190, 232, 0.3); }
-.st-res-top { display: flex; align-items: center; gap: 5px; }
-.st-res-top b { font-size: 14.5px; }
-.st-res-top .st-badge { margin-left: auto; }
 .st-res-icon { color: var(--sky); display: inline-flex; }
-.st-crit { color: var(--sky); font-size: 12.5px; }
-.st-res-head { font: 13px var(--mono); color: var(--st-body); }
 .st-bar { position: relative; height: 5px; border-radius: var(--pill); background: rgba(255, 255, 255, 0.07); overflow: visible; }
 .st-bar span { display: block; height: 100%; border-radius: var(--pill); background: var(--sky); }
-.st-res.warn .st-bar span { background: var(--st-warn); }
-.st-res.fail .st-bar span { background: var(--st-fail); }
 .st-bar i { position: absolute; top: -2px; width: 1px; height: 9px; background: rgba(255, 255, 255, 0.55); }
 .st-res-why { display: block; font-size: 13.5px; color: var(--st-body); line-height: 1.5; padding: 6px 0 2px; }
 .st-reqmini-list, .st-issues { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
@@ -288,6 +274,31 @@
 .st-reqmini-label { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .st-reqmini-val { font: 13px var(--mono); color: var(--st-muted); }
 .st-reqmini .st-res-why { padding: 4px 12px 6px; }
+/* a cut-off requirement shows in full while pointed at or tapped */
+.st-reqmini { position: relative; }
+.st-tip { position: absolute; left: 10px; bottom: calc(100% - 2px); z-index: 4; width: max-content; max-width: calc(100% - 20px); padding: 5px 9px; border-radius: 8px; background: #0b1024; border: 1px solid var(--st-line2); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45); font-size: 13.5px; line-height: 1.4; color: var(--st-text); pointer-events: none; }
+
+/* the resources: one box, two to a row, a name, a value and a bar (the middle third is just right) */
+.st-stats { margin-bottom: 8px; padding: 10px 10px 8px; border-radius: 18px; border: 1px solid var(--st-line2); background: rgba(28, 36, 64, 0.5); }
+.st-stats-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px 14px; }
+.studio .st-stat { --tone: var(--st-text); display: flex; flex-direction: column; gap: 6px; min-width: 0; padding: 8px 6px 9px; border: none; border-radius: 10px; background: transparent; text-align: left; }
+.studio .st-stat:hover:not(:disabled) { background: rgba(255, 255, 255, 0.05); }
+.studio .st-stat.on { background: rgba(96, 190, 232, 0.12); }
+.studio .st-stat.good { --tone: var(--st-good); }
+.studio .st-stat.warn, .studio .st-stat.over { --tone: var(--st-warn); }
+.studio .st-stat.fail { --tone: #ff6b6e; }
+.st-stat-row { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; min-width: 0; }
+.st-stat-row b { font: 700 13.5px var(--sans); letter-spacing: 0.07em; text-transform: uppercase; color: var(--st-body); white-space: nowrap; }
+.st-stat-row b i { margin-left: 3px; font-style: normal; font-size: 11px; color: var(--sky); }
+.st-stat-row em { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: normal 700 15px var(--sans); color: var(--tone); }
+.st-stat-bar { height: 4px; border-radius: 2px; overflow: hidden; background: linear-gradient(90deg, rgba(255, 255, 255, 0.08) 33.3%, rgba(255, 255, 255, 0.17) 33.3% 66.7%, rgba(255, 255, 255, 0.08) 66.7%); }
+.st-stat-bar span { display: block; height: 100%; background: rgba(255, 255, 255, 0.5); box-shadow: inset -7px 0 0 var(--tone); }
+.st-stat-note { --tone: var(--st-good); margin: 6px 4px 2px; padding: 9px 12px; border-radius: 12px; border-left: 3px solid var(--tone); background: rgba(255, 255, 255, 0.04); font-size: 14px; line-height: 1.5; color: var(--st-body); }
+.st-stat-note.warn, .st-stat-note.over { --tone: var(--st-warn); }
+.st-stat-note.fail { --tone: #ff6b6e; }
+.st-stat-note p { margin: 0; }
+.st-stat-note p + p { margin-top: 6px; }
+.st-stat-note b { color: var(--st-text); }
 .st-issue { display: flex; gap: 8px; padding: 8px 11px; border-radius: 14px; background: var(--st-panel2); border: 1px solid var(--st-line); font-size: 14px; }
 .st-issue-icon { flex: none; width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; font: 700 12px var(--mono); color: var(--night); }
 .st-issue.fail .st-issue-icon { background: var(--st-fail); color: #fff; }
@@ -752,17 +763,9 @@
 .st-rfold-title { font: 500 13px var(--mono); letter-spacing: 0.14em; text-transform: uppercase; color: #fff; }
 .st-rfold-sum { margin-left: auto; font: 13px var(--mono); }
 .st-rfold-body { padding: 0 10px 12px; }
-.st-res-dots { display: inline-flex; gap: 4px; }
-.st-res-dot { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; border: 1px solid var(--st-line2); color: var(--st-muted); }
-.st-res-dot.good { color: var(--st-good); border-color: rgba(47, 212, 127, 0.6); }
-.st-res-dot.warn { color: var(--st-warn); border-color: rgba(245, 213, 71, 0.6); }
-.st-res-dot.fail { color: #ff8a8c; border-color: var(--st-fail); background: rgba(229, 56, 59, 0.16); }
-.st-res-dot.over { color: var(--st-warn); border-color: rgba(245, 213, 71, 0.4); border-style: dashed; }
 .st-ok { color: var(--st-good); }
 .st-bad { color: #ff8a8c; }
 .st-warnword { color: var(--st-warn); }
-.st-res-grid { grid-template-columns: 1fr; }
-.studio .st-res.over { border-left-color: var(--st-warn); }
 .st-badge.over { color: var(--st-warn); border-color: rgba(245, 213, 71, 0.45); background: rgba(245, 213, 71, 0.06); }
 
 /* ------------------------------------------------------------ the center: build list, change card, feed */
