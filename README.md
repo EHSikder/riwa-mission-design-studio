@@ -50,13 +50,18 @@ The Resource Manager splits mass, power and money between the desks, and going o
 
 We looked at how real space teams work and built the game around that.
 
-- **Concurrent design.** NASA JPL's Team X and ESA's Concurrent Design Facility put every subsystem engineer in one room, each at their own station, all working on one shared design. That's what the desks are.
-- **Phases and reviews.** NASA runs projects in phases (concept, design, build and test, operations) with a review board at each gate. So the game goes Brief, Design, Review, Build and fly, Report.
-- **Test as you fly.** Every build hides a few flaws. A vibration test, a thermal vacuum test, a deployment test, a radio test and a mission rehearsal each find one kind. Skip a test and that flaw flies with you, and shows up after launch.
+- **Start from the user.** NASA splits every mission into four segments (launch, space, ground, user) and says to begin with the end in mind. The review board opens with them, user first.
+- **Concurrent design.** NASA JPL's Team X, Goddard's Mission Design Lab and ESA's Concurrent Design Facility put every subsystem engineer in one room, each at their own station, all working on one shared design. That's what the desks are.
+- **Phases and reviews.** NASA runs projects in phases (concept, design, build and test, operations) with a review at each gate. So the game goes Brief, Design, Review, Build and fly, Report, and the flight has NASA's real reviews in it (flight readiness, critical event readiness before orbit insertion, post-launch assessment).
+- **Concept maturity.** JPL scores a mission idea from CML 1 (a sketch on a napkin) to CML 4 (a point design with margins). The review board shows your level with JPL's own checklist: green, yellow, red, and 80% green to pass. Comparing designs in the hangar is what gets you past the trade space.
+- **Test as you fly.** Every build hides a few flaws. A vibration test, a thermal vacuum test, a deployment test, a radio test and a day-in-the-life test each find one kind, at the levels NASA's launch rules for CubeSats ask for. Skip a test and that flaw flies with you, and shows up after launch.
+- **The paperwork is engineering too.** Early in the build you file the radio licence, the imaging licence and the debris assessment, like NASA's CubeSat 101 says. Leave a satellite in an orbit it won't fall out of and the licence gets refused until you add a drag sail.
 - **Problems come as telemetry.** When something breaks in orbit you don't get told the answer. You get the readings (currents, temperatures, pressures, what each sensor says) and pick a fix. The right one works within a day, a wrong guess costs days, and "safe mode and investigate" is slow but always works. That's how flight controllers actually do it.
-- **Sweet spots, not "more is better".** Every resource gauge shows too little, just right and more than needed. More power than you need sounds fine, but it's extra mass, money and drag that could have bought something useful, so the game tells you that too.
+- **Sweet spots, not "more is better".** Every resource gauge shows too little, just right and more than needed, and says where its range comes from (JPL keeps 35% mass and power margin at the concept stage, because parts always come in heavier, and in the game they do).
 
-Plus: a 3D spacecraft that grows as you build it (with an x-ray to see inside) and flies the camera to whatever you just changed, a launch show with countdown and sound, sound effects everywhere (you can mute them), a hangar to save designs and compare them side by side, share links, a score out of 1000 with a full report, "fly again with the same luck" so you can test one change fairly, a local leaderboard and a network one.
+Plus: a 3D spacecraft that grows as you build it (with an x-ray to see inside) and flies the camera to whatever you just changed, an orbit view drawn to scale with the equations from NASA's Mission Viz, a launch show with countdown and sound, sound effects everywhere (you can mute them), a hangar to save designs and compare them side by side, share links, a score out of 1000 with a full report that ends with real missions like yours (like NASA's Webb telescope game does), "fly again with the same luck" so you can test one change fairly, a local leaderboard and a network one.
+
+We used every resource on the challenge's Resources tab that fits the game. What came from where: [CHALLENGE-RESOURCES.md](CHALLENGE-RESOURCES.md).
 
 ## Run it yourself
 
@@ -108,6 +113,6 @@ tests/              model, physics, coverage, build, flight, crew, team and serv
 ## Licence, sources and AI use
 
 - **Licence:** Apache License 2.0, see [LICENSE](LICENSE).
-- **Sources:** every data source and software package is in [REFERENCES.md](REFERENCES.md).
+- **Sources:** every data source and software package is in [REFERENCES.md](REFERENCES.md), and what we took from each resource on the challenge's Resources tab is in [CHALLENGE-RESOURCES.md](CHALLENGE-RESOURCES.md).
 - **AI use:** the code, tests and documents were written with Claude Code (Anthropic) while we directed it, and the metadata of `index.html` says so too. The sound effects are generated by that code in your browser (tones and noise), they aren't recordings or AI audio. The game has no AI-generated images or video.
 - This project isn't endorsed by NASA or GGPEN and doesn't use their insignia.

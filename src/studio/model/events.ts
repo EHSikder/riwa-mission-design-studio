@@ -10,12 +10,12 @@
  * - Crewed flights: the checkout, the go/no-go for the Moon, the burns, the storm shelter, the splashdown.
  */
 import type { Analysis } from './analyze';
-import { ADCS, COMPUTERS, LAUNCHERS, PROPULSION, STATIONS } from './catalog';
+import { ADCS, COMPUTERS, LAUNCHERS, PLATFORMS, PROPULSION, STATIONS } from './catalog';
 import { SHELTERS } from './crew';
 import { INSTRUMENTS, type InstrumentId } from './instruments';
 import type { EventOption, MissionRun, Reading, SimEvent, SimState } from './simulate';
-import { DEFECTS, TESTS, type DefectId, type TestId } from './tests';
-import { MARS_YEAR_DAYS, type RoleId } from './types';
+import { DEFECTS, TESTS, foundText, type DefectId, type TestId } from './tests';
+import { G0, MARS_YEAR_DAYS, type RoleId } from './types';
 
 export type Scored = EventOption & { quality: number };
 
@@ -89,6 +89,46 @@ export const EVENTS: Spec[] = [
       return `$${c.toFixed(1)}M more, taken from the reserve.`;
     },
     lesson: 'Almost every space project grows in cost: that is what the reserve is for.',
+  },
+  {
+    // JPL keeps >= 35% growth allowance and margin at the point-design stage (Concept Maturity Levels paper);
+    // NASA's handbook: margins are allocated early and used up on the way to launch. The size is our estimate.
+    id: 'mass-growth', title: 'Parts arrive heavier', phase: 'development', role: 'spacecraft',
+    applies: (a) => a.mass.dryKg > 0 && a.mass.limitKg > 0,
+    rate: () => 0.45,
+    prepare: (r) => { r.st.growthKg = r.a.mass.dryKg * (0.04 + 0.08 * r.rng.next()); },
+    text: (a, st) => {
+      const g = st.growthKg ?? 0, spare = a.mass.limitKg - a.mass.wetKg;
+      return `Weighed at last, the parts come in ${f1(g)} kg over their estimates, beyond the growth allowance (${f1((g / a.mass.dryKg) * 100)}% of the dry mass). ${spare >= g ? `${f1(spare)} kg of lift were spare.` : `Only ${f1(Math.max(0, spare))} kg of lift were spare.`}`;
+    },
+    options: (a, st) => {
+      const g = st.growthKg ?? 0, spare = a.mass.limitKg - a.mass.wetKg;
+      if (spare >= g) return [];
+      const cube = PLATFORMS[a.design.platform].cubesat;
+      const fixM = (cube ? 0.02 : 0.04) * a.cost.developmentM;
+      const out: Scored[] = [{ id: 'lighten', label: `Lighten the design (+2 months, $${fixM.toFixed(1)}M)`, explain: cube ? 'The CubeSat Design Specification\'s mass limit is hard: the dispenser will not take a heavier CubeSat.' : 'Thinner panels, lighter brackets, a smaller harness: slow and costly, but nothing is lost.', quality: 0.75 }];
+      const prop = PROPULSION[a.design.propulsion];
+      if (!cube && prop.isp > 0 && a.mass.propellantKg > g) {
+        const loss = prop.isp * G0 * Math.log((a.mass.dryKg + g) / a.mass.dryKg);
+        out.push({ id: 'offload', label: `Load ${f1(g)} kg less propellant (−${loss.toFixed(0)} m/s)`, explain: 'No delay, but every m/s you give up is orbit-keeping or a burn you cannot do later.', quality: a.dv.capabilityMs - loss >= a.dv.totalMs ? 0.6 : 0.15 });
+      }
+      return out;
+    },
+    resolve: (r, o) => {
+      const a = r.a, g = r.st.growthKg ?? 0;
+      if (a.mass.limitKg - a.mass.wetKg >= g) return 'The mass margin absorbed it: that is what it is for.';
+      if (o === 'offload') {
+        const prop = PROPULSION[a.design.propulsion];
+        const loss = prop.isp * G0 * Math.log((a.mass.dryKg + g) / a.mass.dryKg);
+        r.st.dvLeft -= loss;
+        return `${f1(g)} kg less propellant: ${loss.toFixed(0)} m/s less to spend in flight.`;
+      }
+      const fixM = (PLATFORMS[a.design.platform].cubesat ? 0.02 : 0.04) * a.cost.developmentM;
+      r.spend(fixM);
+      const moved = r.slip(2);
+      return `Two months of redesign and $${fixM.toFixed(1)}M later the spacecraft fits again.${moved > 0.01 ? ` Launch moves to month ${f1(r.st.launchMonth)}.` : ''}`;
+    },
+    lesson: 'Every spacecraft gains weight while it is built. JPL keeps at least 35% of the mass as growth allowance and margin at the concept stage for exactly this.',
   },
   // ------------------------------------------------------------------ operations
   {
@@ -316,7 +356,7 @@ export const testStep = (t: TestId): Spec => ({
     const flaw = TESTS[t].finds;
     if (!r.flaws.has(flaw)) return 'Passed. This kind of flaw is not in the build.';
     r.next.unshift(found(flaw));
-    return `Failed. ${DEFECTS[flaw].found}`;
+    return `Failed. ${foundText(flaw, PLATFORMS[r.a.design.platform].cubesat)}`;
   },
   lesson: DEFECTS[TESTS[t].finds].lesson,
 });
@@ -327,7 +367,7 @@ const found = (f: DefectId): Spec => {
   const misses = (a: Analysis, st: SimState) => !!a.scenario.windows && (a.scenario.windows.find((w) => w >= st.readyMonth + DEFECTS[f].fixWeeks / 4.345) ?? Infinity) > st.launchMonth;
   return {
     ...scripted, id: `found:${f}`, title: `The ${TESTS[test].name.toLowerCase()} found a flaw`, role: TESTS[test].role, noRule: true, art: test,
-    text: () => DEFECTS[f].found,
+    text: (a) => foundText(f, PLATFORMS[a.design.platform].cubesat),
     options: (a, st) => {
       const miss = misses(a, st);
       return [
@@ -344,6 +384,34 @@ const found = (f: DefectId): Spec => {
     },
     lesson: DEFECTS[f].lesson,
   };
+};
+
+// ====================================================================== the licences
+/** NASA CubeSat 101: file within 30 days of getting a launch; no licence at integration, no flight. */
+const IMAGING = new Set(['imager', 'sar', 'spectrometer', 'sounder']);
+const imagesEarth = (a: Analysis) => a.scenario.body === 'earth' && a.design.instruments.some((i) => IMAGING.has(INSTRUMENTS[i].kind));
+export const LICENCE: Spec = {
+  ...scripted, id: 'licence', title: 'File the licences', role: 'comms', action: true, art: 'signal',
+  text: (a) => {
+    const papers = [
+      'a radio licence (the frequencies are coordinated through the ITU by your national regulator; in the US the FCC wants at least 90 days)',
+      ...(imagesEarth(a) ? ['an Earth-imaging licence (in the US, NOAA takes about 120 days, and any change restarts the clock)'] : []),
+      ...(a.debris.lowEarth ? ['an orbital debris assessment: proof that the spacecraft comes down within 25 years and burns up on the way'] : []),
+    ];
+    return `The launch is booked. NASA's CubeSat 101 says to file the paperwork within 30 days: ${papers.join('; ')}. A spacecraft without its licences at integration stays on the ground.`;
+  },
+  options: () => [{ id: 'file', label: 'File the paperwork', explain: 'Licences take 4–6 months. Filed now, they arrive before the spacecraft ships.', quality: 1 }],
+  resolve: (r) => {
+    const a = r.a;
+    if (!a.debris.ruleOk) {
+      const c = PLATFORMS[a.design.platform].cubesat ? 0.05 : 0.4;
+      r.spend(c);
+      const moved = r.slip(2);
+      return `The debris assessment fails: with no engine the spacecraft would stay up about ${a.debris.reentryYears.toFixed(0)} years. The regulator will not license the radio until a drag sail is added to bring it down in time: $${c.toFixed(2)}M and two months.${moved > 0.01 ? ` Launch moves to month ${f1(r.st.launchMonth)}.` : ''}`;
+    }
+    return `Filed. ${imagesEarth(a) ? 'The radio and imaging licences' : 'The radio licence'}${a.debris.lowEarth ? ' and the debris assessment' : ''} come back approved a few months later, well before the spacecraft ships.`;
+  },
+  lesson: 'Late licences are one of the classic reasons CubeSats miss their ride: the paperwork is part of the engineering.',
 };
 
 // ====================================================================== launch and commissioning
@@ -370,7 +438,7 @@ export const WEATHER: Spec = {
 
 export const LAUNCH: Spec = {
   ...scripted, id: 'launch', title: 'Launch', role: 'director', action: true, art: 'launch',
-  text: (a) => `${a.design.name} is on top of the ${LAUNCHERS[a.design.launcher].name}, fuelled and counting down. ${a.crew ? `${a.crew.size} astronaut${a.crew.size === 1 ? ' is' : 's are'} strapped in. ` : ''}Every desk has said go.`,
+  text: (a) => `${a.design.name} is on top of the ${LAUNCHERS[a.design.launcher].name}, fuelled and counting down. ${a.crew ? `${a.crew.size} astronaut${a.crew.size === 1 ? ' is' : 's are'} strapped in. ` : ''}The flight readiness review is closed and every desk has said go.`,
   options: () => [{ id: 'go', label: 'Launch', explain: 'There is no way to call a rocket back.', quality: 1 }],
   resolve: (r) => r.ascent(),
   lesson: 'Every rocket has a track record; insurance turns a lost satellite into a second chance.',
@@ -378,7 +446,9 @@ export const LAUNCH: Spec = {
 
 export const DEPLOY: Spec = {
   ...scripted, id: 'deploy', title: 'Unfold the spacecraft', role: 'spacecraft', action: true, art: 'deploy',
-  text: (a) => `The rocket has let go. ${a.design.name} is tumbling slowly on battery power, folded as it was for launch. ${a.design.antenna === 'dish' ? 'The solar wings and the dish' : 'The solar wings'} must open before the battery runs down.`,
+  text: (a) => PLATFORMS[a.design.platform].cubesat
+    ? `${a.design.name} has left its dispenser. CubeSat rules kept it switched off until that moment, and keep everything folded for 30 minutes so nothing can snag the rocket or its neighbours. The 30 minutes are up: ${a.design.antenna === 'dish' ? 'the wings and the dish' : 'the wings'} must open before the battery runs down.`
+    : `The rocket has let go. ${a.design.name} is tumbling slowly on battery power, folded as it was for launch. ${a.design.antenna === 'dish' ? 'The solar wings and the dish' : 'The solar wings'} must open before the battery runs down.`,
   options: () => [{ id: 'go', label: 'Fire the release bolts', explain: 'Each hinge has moved exactly once before: in the test hall, if you tested it.', quality: 1 }],
   resolve: (r) => {
     if (r.flaws.has('deploy')) { r.next.unshift(FLAW_DEPLOY); return 'One wing latched. The other stopped halfway.'; }
@@ -389,7 +459,11 @@ export const DEPLOY: Spec = {
 
 export const SIGNAL: Spec = {
   ...scripted, id: 'signal', title: 'Listen for the first signal', role: 'comms', action: true, art: 'signal',
-  text: (a) => `${STATIONS[a.design.stations[0]]?.short ?? 'The ground station'} is pointed at the place in the sky where the spacecraft should rise. Until it answers, nobody knows if it is alive.`,
+  text: (a) => {
+    const where = `${STATIONS[a.design.stations[0]]?.short ?? 'The ground station'} is pointed at the place in the sky where the spacecraft should rise.`;
+    if (PLATFORMS[a.design.platform].cubesat) return `${where} The radio had to stay silent for its first 45 minutes. ${LAUNCHERS[a.design.launcher].rideshare ? 'Dozens of satellites left the same rocket: tracking data take two days to a week, and working out which object is yours can take weeks. ' : ''}Until it answers, nobody knows if it is alive.`;
+    return `${where} Until it answers, nobody knows if it is alive.`;
+  },
   options: () => [{ id: 'go', label: 'Send the first command', explain: 'A short "are you there?" and a wait for the reply.', quality: 1 }],
   resolve: (r) => {
     if (r.flaws.has('rf')) { r.next.unshift(FLAW_RF); return 'A carrier, but no words: the station cannot read what the spacecraft is saying.'; }
@@ -400,7 +474,7 @@ export const SIGNAL: Spec = {
 
 export const INSERTION: Spec = {
   ...scripted, id: 'insertion', title: 'The braking burn', role: 'director', action: true, art: 'burn',
-  text: (a) => `${a.design.name} is falling toward ${a.orbit.body.name} too fast to stay. The engine must slow it by ${(a.dv.lines.find((l) => /insertion/i.test(l.name))?.value ?? 0).toFixed(0)} m/s at exactly the right moment${a.scenario.body === 'mars' ? ', behind the planet, with no contact' : ''}.`,
+  text: (a) => `${a.design.name} is falling toward ${a.orbit.body.name} too fast to stay. The critical event readiness review has signed off the ${a.scenario.body === 'mars' ? 'Mars' : 'lunar'} orbit insertion: the engine must slow the spacecraft by ${(a.dv.lines.find((l) => /insertion/i.test(l.name))?.value ?? 0).toFixed(0)} m/s at exactly the right moment${a.scenario.body === 'mars' ? ', behind the planet, with no contact' : ''}.`,
   telemetry: (a, st) => [
     { label: 'Δv needed for the burn', value: `${(a.dv.lines.find((l) => /insertion/i.test(l.name))?.value ?? 0).toFixed(0)} m/s`, state: 'ok' },
     { label: 'Δv in the tanks', value: `${Math.max(0, st.dvLeft).toFixed(0)} m/s`, state: st.dvLeft >= (a.dv.lines.find((l) => /insertion/i.test(l.name))?.value ?? 0) ? 'ok' : 'bad' },
@@ -433,7 +507,7 @@ export const FIRSTLIGHT: Spec = {
 
 export const COMMISSIONED: Spec = {
   ...scripted, id: 'arrive', title: 'In the operating orbit', kind: 'milestone',
-  text: () => 'Commissioning complete: the mission begins.',
+  text: () => 'Commissioning complete. At the post-launch assessment review the team hands the spacecraft over to routine operations: the mission begins.',
   resolve: (r) => { r.operate(); return ''; },
   lesson: '',
 };

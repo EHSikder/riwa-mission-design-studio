@@ -91,23 +91,30 @@ export interface Body {
 
 const YEAR_S = 365.2422 * 86_400;
 
+// GM, equatorial radius and rotation are NASA GMAT's defaults (GmatDefaults.hpp, GMAT R2015a-R2026a); J2 is
+// -√5·C20 of the gravity model GMAT loads for each body (Earth JGM-2, Moon LP165P, Mars Mars-50C). The orbit
+// and year values come from the NASA fact sheets.
+const GMAT_DEG_PER_DAY = (deg: number) => (deg * DEG) / 86_400;
+
 export const BODIES: Record<BodyId, Body> = {
-  // standard GM, WGS-84 equatorial radius, J2 and rotation rate
   earth: {
-    id: 'earth', name: 'Earth', mu: 3.986_004_418e14, radius: 6_378_137, j2: 1.082_63e-3, rotation: 7.292_115e-5,
+    id: 'earth', name: 'Earth', mu: 3.986_004_415e14, radius: 6_378_136.3, j2: 1.082_627e-3, rotation: GMAT_DEG_PER_DAY(360.985_623_5),
     sunDistance: AU, sunRate: (2 * Math.PI) / YEAR_S, obliquity: 23.44 * DEG, magneticField: true, atmosphere: true,
   },
-  // GM and the LOLA reference radius
   moon: {
-    id: 'moon', name: 'Moon', mu: 4.902_8e12, radius: 1_737_400, j2: 2.033e-4, rotation: (2 * Math.PI) / (27.3217 * 86_400),
+    id: 'moon', name: 'Moon', mu: 4.902_800_582e12, radius: 1_738_200, j2: 2.032_37e-4, rotation: (2 * Math.PI) / (27.3217 * 86_400),
     sunDistance: AU, sunRate: (2 * Math.PI) / YEAR_S, obliquity: 1.54 * DEG, magneticField: false, atmosphere: false,
   },
-  // NASA Mars Fact Sheet: GM 42 828 km³/s², mean radius 3 389.5 km, J2 1960.45e-6, day 24.6229 h, year 686.98 d
   mars: {
-    id: 'mars', name: 'Mars', mu: 4.282_837e13, radius: 3_389_500, j2: 1.960_45e-3, rotation: (2 * Math.PI) / (24.6229 * 3600),
+    id: 'mars', name: 'Mars', mu: 4.282_831_426e13, radius: 3_397_000, j2: 1.958_616e-3, rotation: GMAT_DEG_PER_DAY(350.891_982_26),
     sunDistance: 1.523_7 * AU, sunRate: (2 * Math.PI) / (686.98 * 86_400), obliquity: 25.19 * DEG, magneticField: false, atmosphere: true,
   },
 };
+
+/** Radius of the geostationary orbit (m): the value NASA GMAT's Hohmann-transfer tutorial targets. */
+export const GEO_RADIUS = 42_164_169;
+/** Its height above GMAT's Earth equator (km): 35 786. */
+export const GEO_ALT_KM = (GEO_RADIUS - 6_378_136.3) / 1000;
 
 export const YEAR = YEAR_S;
 export const MARS_YEAR_DAYS = 686.98;

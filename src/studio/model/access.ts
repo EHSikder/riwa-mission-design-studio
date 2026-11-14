@@ -8,7 +8,7 @@
  * - Mars: the Earth–Mars distance through the mission, and the solar-conjunction blackout.
  */
 import { LUNAR_SITES, REGIONS, inRegion, regionBox, regionGrid, type RegionId } from './regions';
-import { AU, BODIES, DEG, type Body } from './types';
+import { AU, BODIES, DEG, GEO_RADIUS, type Body } from './types';
 
 export interface AccessSensor {
   id: string;
@@ -299,7 +299,7 @@ export function horizonAngle(body: Body, altKm: number, minElDeg: number): numbe
 /** Share of a region whose points see a GEO slot at least `minElDeg` above the horizon. */
 export function geoService(lonDeg: number, region: RegionId, minElDeg = 20): number {
   const pts = regionGrid(REGIONS[region]);
-  const k = BODIES.earth.radius / 42_164_000;
+  const k = BODIES.earth.radius / GEO_RADIUS;
   let ok = 0;
   for (const p of pts) {
     const c = Math.acos(Math.cos(p.lat * DEG) * Math.cos((p.lon - lonDeg) * DEG));

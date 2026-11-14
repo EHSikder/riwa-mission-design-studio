@@ -11,7 +11,7 @@
  * Pure and deterministic: the UI runs it on every change, the mission simulation starts from it, the tests pin it.
  */
 import {
-  ADCS, AIT_COST_FRACTION, ANTENNAS, ARRAY_MOUNTS, BANDS, BATTERY_COST_PER_WH_M, BATTERY_WH_PER_KG, CELLS, COMPUTERS,
+  ADCS, AIT_COST_FRACTION, ANTENNAS, ARRAY_MOUNTS, BANDS, BATTERY_COST_PER_WH_M, BATTERY_WH_PER_KG, CELLS, COMPUTERS, CUBESAT_MAX_TX_W,
   INTEGRATION_MASS_FRACTION, LAUNCHERS, ORBIT_TYPES, PANEL_FACTOR, PLATFORMS, PROPULSION, STATIONS, batteryCycleLife,
   pcduCostM, pcduKg, storageCostM, storageKg, storageW, transmitterCostM, transmitterKg, type LauncherId, type StationId,
 } from './catalog';
@@ -80,10 +80,12 @@ export interface Gauge {
   /** Why too little is a problem, and why too much is. */
   under: string;
   over: string;
+  /** Where the range comes from: a published rule, or a rule of this game. */
+  source?: string;
 }
 
 /** Place `x` on a sweet-spot bar whose just-right range is lo…hi; `min` and `max` are the ends of the bar. */
-export function gaugeOf(x: number, lo: number, hi: number, min: number, max: number, text: Pick<Gauge, 'label' | 'value' | 'ideal' | 'under' | 'over'>): Gauge {
+export function gaugeOf(x: number, lo: number, hi: number, min: number, max: number, text: Pick<Gauge, 'label' | 'value' | 'ideal' | 'under' | 'over' | 'source'>): Gauge {
   const c = (v: number) => Math.min(1, Math.max(0, v));
   const v = Number.isFinite(x) ? x : x > 0 ? max : min;
   const pos = v < lo ? c((v - min) / (lo - min)) / 3 : v <= hi ? (1 + c((v - lo) / Math.max(1e-9, hi - lo))) / 3 : (2 + c((v - hi) / (max - hi))) / 3;
@@ -154,6 +156,8 @@ export interface Analysis {
   tests: { planned: TestId[]; skipped: TestId[]; weeks: number; costM: number };
   /** People on board: the trip, the supplies, the dose (crewed missions). */
   crew: CrewPlan | null;
+  /** End of life in low Earth orbit: years the spacecraft would stay up with no engine, and the 25-year rule. */
+  debris: { lowEarth: boolean; reentryYears: number; ruleOk: boolean };
 }
 
 const f0 = (x: number) => (Number.isFinite(x) ? x.toFixed(0) : '∞');
@@ -467,7 +471,7 @@ export function analyze(d: StudioDesign, difficulty: Difficulty = 'engineer'): A
   const totalDv = sum(dvLines.map((l) => l.value));
   if (totalDv > 0 && prop.isp === 0 && !lowEarth) issue('fail', 'spacecraft', `This mission needs ${f0(totalDv)} m/s of Δv, and the spacecraft has no engine.`, 'Add propulsion: bipropellant for big burns, electric to save mass.', 'mass');
   if (electric && (s.body === 'moon' || s.body === 'mars')) issue('fail', 'spacecraft', 'Electric thrusters are far too gentle to brake into orbit on arrival: the spacecraft would fly past.', 'Use chemical propulsion (monopropellant or bipropellant) for the insertion burn.', 'mass');
-  if (p.cubesat && (d.propulsion === 'biprop' || d.propulsion === 'mono')) issue('warn', 'spacecraft', 'Rideshare rules rarely allow toxic propellants on a CubeSat.', 'Cold gas or electric propulsion is CubeSat-friendly.');
+  if (p.cubesat && (d.propulsion === 'biprop' || d.propulsion === 'mono')) issue('warn', 'spacecraft', 'The CubeSat Design Specification allows propulsion only behind three independent safety switches, and launch providers rarely accept toxic propellants on a CubeSat.', 'Cold gas or electric propulsion is CubeSat-friendly.');
   const wetKg = dryKg + propKg;
   const capability = dvFor(dryKg, propKg, prop.isp);
   const dvFixed = totalDv - perYear * years;
@@ -608,7 +612,7 @@ export function analyze(d: StudioDesign, difficulty: Difficulty = 'engineer'): A
   ];
   const totalM = sum(costLines.map((l) => l.value));
   const budgetM = s.budgetM * diff.budget;
-  if (d.reservePct < 10 && difficulty !== 'sandbox') issue('warn', 'resources', `A ${f0(d.reservePct)}% reserve is thin: one surprise in development and the mission is over budget.`, 'Projects usually hold 15–30%.', 'budget');
+  if (d.reservePct < 10 && difficulty !== 'sandbox') issue('warn', 'resources', `A ${f0(d.reservePct)}% reserve is thin: one surprise in development and the mission is over budget.`, 'NASA\'s CubeSat 101 guide asks even a CubeSat team for at least 10%; bigger projects size theirs from their risks (JPL).', 'budget');
 
   // ---------------------------------------------------------------- time
   const devParts: Line[] = [
@@ -645,7 +649,9 @@ export function analyze(d: StudioDesign, difficulty: Difficulty = 'engineer'): A
   if (bolW > requiredW && cell.degradationPerYear > 0) limits.push({ name: 'Solar cell ageing', value: Math.log(requiredW / bolW) / Math.log(1 - cell.degradationPerYear) - transferYears });
   const lifetimeYears = Math.max(0, Math.min(...limits.map((l) => l.value)));
   const lifeLimiter = limits.reduce((a, b) => (b.value < a.value ? b : a));
-  if (lowEarth && prop.isp === 0 && decayEnd > years + 25) issue('warn', 'director', `At ${f0(facts.altKm)} km with no engine the satellite stays in orbit ~${f0(decayEnd)} years: space-debris rules ask for re-entry within 25 years of the end of the mission.`, 'Fly lower, or carry propulsion to de-orbit.');
+  const debrisOk = !(lowEarth && prop.isp === 0 && decayEnd > years + 25);
+  if (!debrisOk) issue('warn', 'director', `At ${f0(facts.altKm)} km with no engine the satellite stays in orbit ~${f0(decayEnd)} years: NASA's debris standard asks for re-entry within 25 years of the end of the mission, and without a passing debris assessment there is no radio licence.`, 'Fly lower, or carry propulsion to de-orbit.');
+  if (p.cubesat && has.radio && d.txW > CUBESAT_MAX_TX_W) issue('warn', 'comms', `${f0(d.txW)} W is more than CubeSat radios transmit: NASA's small-spacecraft survey finds 0.5–5 W.`, `A CubeSat cannot supply or shed the heat of a bigger amplifier: stay at ${CUBESAT_MAX_TX_W} W or less, and win the rest with the antenna or the ground station.`, 'comms');
   if (lifeLimiter.name.startsWith('Radiation') && lifetimeYears < years) issue('warn', 'spacecraft', `Radiation will wear out the electronics after ~${f1(lifetimeYears)} years.`, 'A radiation-hardened computer lasts much longer.');
 
   // ---------------------------------------------------------------- requirements
@@ -911,33 +917,39 @@ export function analyze(d: StudioDesign, difficulty: Difficulty = 'engineer'): A
   const pct = (x: number) => `${x >= 0 ? '+' : ''}${f0(x)}%`;
   const spareData = generated > 0 ? ((capacityDay - generated) / generated) * 100 : 0;
   const slack = deadlineMonth - launchMonth;
-  if (has.structure) resources.mass.gauge = gaugeOf(massMargin * 100, thin, 30, -30, 90, {
-    label: 'Lift to spare', value: pct(massMargin * 100), ideal: `${thin}–30%`,
+  if (has.structure) resources.mass.gauge = gaugeOf(massMargin * 100, thin, 40, -30, 100, {
+    label: 'Lift to spare', value: pct(massMargin * 100), ideal: `${thin}–40%`,
     under: 'Too heavy: the rocket or the platform cannot carry it, or there is no room left for the mass that every project gains while it is built.',
     over: 'You are paying for lift you do not use. A smaller rocket or platform would be cheaper, or the spare kilograms could carry another instrument.',
+    source: "JPL keeps at least 35% of the dry mass as growth allowance and margin when a concept becomes a point design (Concept Maturity Level 4), because every spacecraft gains mass while it is built. NASA's handbook says margins are allocated early and used up on the way to launch. The lower end here is this game's rule.",
   });
-  if (has.arrays) resources.power.gauge = gaugeOf(powerMargin * 100, 10, 40, -50, 150, {
-    label: 'Power to spare', value: pct(powerMargin * 100), ideal: '10–40%',
+  if (has.arrays) resources.power.gauge = gaugeOf(powerMargin * 100, 10, 50, -50, 150, {
+    label: 'Power to spare', value: pct(powerMargin * 100), ideal: '10–50%',
+    source: "JPL asks a point design for at least 35% power and 35% energy margin (Concept Maturity Level 4); the arrays and battery also lose capacity as they age, which this game already counts. The 10% floor is this game's rule for the end of the mission.",
     under: 'Not enough power: instruments switch off and the battery never fully recharges after a shadow.',
     over: 'Extra power is not free. Every square metre of array is mass the rocket lifts and money not spent on instruments; big wings also catch more air drag in low orbit and are harder to hold steady. Engineers aim for a modest margin, not the biggest array.',
   });
   if (Number.isFinite(budgetM)) resources.budget.gauge = gaugeOf(((budgetM - totalM) / budgetM) * 100, 0, 15, -40, 60, {
     label: 'Budget left', value: pct(((budgetM - totalM) / budgetM) * 100), ideal: '0–15%',
+    source: "This is money left after the reserve, which is already in the cost. NASA's CubeSat 101 asks even a CubeSat team to hold a reserve of at least 10%; bigger projects set theirs from their risks (JPL). The range itself is this game's rule.",
     under: 'Over budget: the customer cannot pay for this design.',
     over: 'Money left over is mission you did not buy: a better instrument, a goal-level requirement, more tests or a bigger reserve.',
   });
   if (!transponders.length && !(generated === 0 && relays.length) && generated > 0 && capacityDay > 0) resources.data.gauge = gaugeOf(spareData, 0, 100, -100, 500, {
     label: 'Downlink to spare', value: pct(spareData), ideal: '0–100%',
+    source: "This game's rule. JPL sizes the data system at the point-design stage from the quantity, quality, continuity and latency the science needs.",
     under: 'The instruments make more than the link can send: the rest is lost, or never taken.',
     over: 'The link is far bigger than the instruments need. Transmitter power, antenna size and ground-station time are being paid for and not used.',
   });
   if (rateTyp > 0 && Number.isFinite(marginDb)) resources.comms.gauge = gaugeOf(marginDb, 3, 10, -10, 30, {
     label: 'Signal to spare', value: `${marginDb >= 0 ? '+' : ''}${f1(marginDb)} dB`, ideal: '3–10 dB',
+    source: "JPL asks for at least 3 dB of link margin on deep-space links and 6 dB on short proximity links (Concept Maturity Level 4). The 10 dB upper end is this game's rule.",
     under: 'The signal arrives too weak at the farthest point: errors, or no link at all when it rains.',
     over: 'More signal than needed. A smaller transmitter or antenna would save power and mass, or the same link could carry a faster data rate.',
   });
   if (has.structure && Number.isFinite(deadlineMonth)) resources.time.gauge = gaugeOf(slack, 2, 8, -12, 24, {
     label: 'Schedule to spare', value: `${slack >= 0 ? '+' : ''}${f0(slack)} months`, ideal: '2–8 months',
+    source: "This game's rule. NASA's CubeSat 101 says to pad the build schedule generously: the launcher never waits for a late CubeSat, and a typical one takes 18–24 months.",
     under: slack < 0 ? 'Late: the launch comes after the deadline.' : 'No room for a late part or a failed test.',
     over: 'A lot of slack: there was time for a more capable instrument, or for more tests.',
   });
@@ -954,6 +966,7 @@ export function analyze(d: StudioDesign, difficulty: Difficulty = 'engineer'): A
     cost: { lines: costLines, developmentM, launchM: priceM, operationsM: groundM + opsM, reserveM, totalM, budgetM, marginPct: ((budgetM - totalM) / budgetM) * 100 },
     data: { instruments: uses, generatedGbitDay: generated, capacityGbitDay: capacityDay, deliveredGbitDay: deliveredDay, lossPct, storageNeedGbit: storageNeed, latencyH: access ? Math.min(...regionsNeeded.map((r) => access!.regions[r]!.latencyH)) : (24 - d.trackHoursPerDay) / 2 + lightTime / 3600, missionTbit, dataLimited },
     comms: { rateMbps: rateTyp, worstMbps: rateWorst, marginDb, contactMinPerDay: contactMin, passesPerDay: passes, rangeKm, lightTimeS: lightTime, station: stationName },
+    debris: { lowEarth, reentryYears: lowEarth && prop.isp === 0 ? decayEnd : 0, ruleOk: debrisOk },
     time: { devMonths, longest: longest.name, launchMonth, deadlineMonth, serviceMonth, lifetimeYears, limits, raiseDays },
     launch: { ok: reasons.length === 0, capacityKg, priceM, reasons, options: launchOptions },
     requirements: results,

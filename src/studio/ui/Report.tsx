@@ -6,6 +6,7 @@
  */
 import { useEffect, useState } from 'react';
 import { DIFFICULTY } from '../model/design';
+import { realMissionsLike } from '../model/realMissions';
 import { listRooms } from '../net/room';
 import { useStudio } from '../state';
 import { saveDesign, shareLink, topScores } from '../storage';
@@ -50,6 +51,31 @@ function RoomBoard() {
         </ol>
       )}
     </>
+  );
+}
+
+/** Real missions closest to the design that flew, as NASA's "Build It Yourself: Telescope" game shows its players. */
+function RealMissions() {
+  const run = useStudio((s) => s.run);
+  if (!run) return null;
+  const like = realMissionsLike(run.a);
+  if (!like.length) return null;
+  return (
+    <section className="st-card-panel wide">
+      <h3>Real missions like yours</h3>
+      <div className="st-real">
+        {like.map(({ mission: m, why }) => (
+          <article key={m.id}>
+            <b>{m.name}</b>
+            <span className="st-dim">{m.who} · {m.year}</span>
+            <p>{m.what}</p>
+            {why.length > 0 && <p className="st-real-why">Like yours: {why.join(', ')}.</p>}
+            {m.link && <a href={m.link} target="_blank" rel="noreferrer">Learn more →</a>}
+          </article>
+        ))}
+      </div>
+      <p className="st-sub">The idea comes from NASA's "Build It Yourself: Telescope" game, which ends by showing the real telescopes your design resembles.</p>
+    </section>
   );
 }
 
@@ -129,6 +155,10 @@ export function ReportScreen() {
           {r.limited.length > 0 && <><h4 className="st-bad">What limited the mission</h4><ul className="st-why">{r.limited.map((t) => <li key={t}>{t}</li>)}</ul></>}
           {r.tryNext.length > 0 && <><h4 className="st-next">Try next time</h4><ul className="st-why">{r.tryNext.map((t) => <li key={t}>{t}</li>)}</ul></>}
         </section>
+
+        <RealMissions />
+
+
 
         <section className="st-card-panel wide">
           <h3>Requirements: promised and delivered</h3>

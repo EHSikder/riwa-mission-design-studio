@@ -4,6 +4,10 @@
  * station and rehearsed, because a flaw found on the ground costs weeks and a flaw found in orbit can cost the
  * mission. Every build hides a few flaws (drawn from the flight's seed); a test finds the flaw of its kind, if
  * there is one, and the team decides whether to fix it. Flaws nobody looked for fly with the spacecraft.
+ *
+ * Test levels follow NASA's launch rules for CubeSats (LSP-REQ-317.01, Table 1) and NASA's CubeSat 101: vibration
+ * and a thermal-vacuum bake-out for every CubeSat, a "day in the life" test before the software is frozen.
+ * Durations, costs and the chance of each flaw are this game's estimates.
  */
 import type { StudioDesign } from './design';
 import { createRng } from './rng';
@@ -32,31 +36,31 @@ const deployables = (d: StudioDesign) => (d.mount !== 'body' && d.arrayM2 > 0) |
 export const TESTS: Record<TestId, TestSpec> = {
   vibration: {
     name: 'Vibration test', short: 'Shake', role: 'spacecraft', finds: 'structure', weeks: 2, costShare: 0.02,
-    explain: 'The spacecraft is bolted to a shaker table and shaken as hard as the rocket will shake it.',
+    explain: `The spacecraft is bolted to a shaker and shaken along each of its three axes for two minutes, 3 dB above the launcher's predicted levels: the "protoflight" test in NASA's launch rules for CubeSats.`,
     catches: 'A cracked bracket or a loose connector that the launch would break.',
     applies: () => true,
   },
   tvac: {
     name: 'Thermal vacuum test', short: 'Bake', role: 'spacecraft', finds: 'thermal', weeks: 4, costShare: 0.04,
-    explain: 'Days in a chamber with no air, cycled between the heat of full sunlight and the cold of shadow.',
+    explain: "Days in a chamber with no air, cycled between the heat of full sunlight and the cold of shadow. NASA's launch rules also bake every CubeSat at 70 °C for at least 3 hours in vacuum, so it gives off no gas onto the other passengers.",
     catches: 'A part that overheats or freezes once there is no air to carry the heat away.',
     applies: () => true,
   },
   deploy: {
     name: 'Deployment test', short: 'Unfold', role: 'spacecraft', finds: 'deploy', weeks: 1, costShare: 0.01,
-    explain: 'The wings and the dish are unfolded on the ground, hanging from wires so that gravity does not help or hinder.',
+    explain: 'The wings and the dish are unfolded on the ground, hanging from wires so that gravity does not help or hinder, released by the same timers and burn wires that will free them in orbit.',
     catches: 'A hinge or a latch that sticks in orbit, where nobody can push it.',
     applies: deployables,
   },
   compat: {
     name: 'Ground station compatibility test', short: 'Talk', role: 'comms', finds: 'rf', weeks: 1, costShare: 0.015,
-    explain: 'The real radio talks to the real ground station through a cable: every command, every data format.',
+    explain: "The real radio talks to the real ground station through a cable: every command, every data format. NASA's CubeSat 101 adds: build the station early and practise on other satellites' beacons first.",
     catches: 'A spacecraft in orbit that the ground cannot understand.',
     applies: (d) => d.antenna !== 'none',
   },
   rehearsal: {
-    name: 'Mission rehearsal', short: 'Rehearse', role: 'director', finds: 'software', weeks: 2, costShare: 0.015,
-    explain: 'The flight software runs for days against a simulator while the team practises its failures before they happen.',
+    name: 'Day-in-the-life test', short: 'Rehearse', role: 'director', finds: 'software', weeks: 2, costShare: 0.015,
+    explain: "The spacecraft runs for days exactly as it will in orbit, against a simulator, while the team rehearses its failures before they happen. NASA's CubeSat 101 makes this test mandatory, and freezes the software after it.",
     catches: 'A software fault that shows up in orbit, where a fix takes days.',
     applies: (d) => d.computer !== 'none',
   },
@@ -77,8 +81,9 @@ export const TESTS: Record<TestId, TestSpec> = {
 export const TEST_IDS = Object.keys(TESTS) as TestId[];
 
 export interface Defect {
-  /** What the test report says when it finds the flaw. */
+  /** What the test report says when it finds the flaw, and on a CubeSat if that is different. */
   found: string;
+  foundCube?: string;
   /** Chance a build carries it. */
   chance: number;
   fixWeeks: number;
@@ -89,6 +94,8 @@ export interface Defect {
 export const DEFECTS: Record<DefectId, Defect> = {
   structure: {
     found: 'On the shaker a bracket cracked. Engineers can redesign it, or argue that it will hold.',
+    // NASA CubeSat 101: the burn wire that holds a deployable is a classic failure in vibration
+    foundCube: 'On the shaker the burn wire holding the antenna let go: it sprang open in the test, and would have sprung open inside the dispenser.',
     chance: 0.4, fixWeeks: 6, fixShare: 0.03,
     lesson: 'Tests are cheaper than failures in orbit: the vibration test exists to find what launch would break.',
   },
@@ -125,6 +132,9 @@ export const DEFECTS: Record<DefectId, Defect> = {
 };
 
 export const DEFECT_IDS = Object.keys(DEFECTS) as DefectId[];
+
+/** The test report's words for a flaw, for this spacecraft. */
+export const foundText = (f: DefectId, cubesat: boolean) => (cubesat && DEFECTS[f].foundCube) || DEFECTS[f].found;
 
 /**
  * The flaws hidden in this build. They come from the flight's seed through their own sequence, so the rest of

@@ -13,9 +13,8 @@ Every number in the catalogs carries its own source note in the code (`src/studi
 | [Mars Reconnaissance Orbiter](https://science.nasa.gov/mission/mars-reconnaissance-orbiter/): HiRISE, CTX, CRISM, Mars Climate Sounder, SHARAD | Resolution, swath, mass and power of the Mars instruments, and the size of the Mars platform |
 | [Lunar Reconnaissance Orbiter](https://science.nasa.gov/mission/lro/): LROC narrow-angle camera | The lunar camera |
 | [MAVEN](https://science.nasa.gov/mission/maven/): imaging ultraviolet spectrograph, magnetometer (with Mars Global Surveyor) | The Mars atmosphere and magnetic-field instruments, as class references |
-| [Small Spacecraft Technology State of the Art](https://www.nasa.gov/smallsat-institute/sst-soa) | Solar cells, batteries, cold-gas thrusters, onboard computers, attitude control |
+| [Small Spacecraft Technology State of the Art](https://www.nasa.gov/smallsat-institute/sst-soa) | Solar cells, batteries, cold-gas thrusters, onboard computers, attitude control; from the power and communications chapters: panels 40–75 W/kg, battery packs 110–250 Wh/kg, CubeSat radio data rates and transmit power (0.5–5 W) |
 | [DSN Telecommunications Link Design Handbook (810-005)](https://deepspace.jpl.nasa.gov/dsndocs/810-005/) | The receiving performance of the Deep Space Network's 34 m antennas |
-| LOLA reference radius of the Moon | A physical constant (`src/studio/model/types.ts`) |
 | [Orion spacecraft](https://www.nasa.gov/humans-in-space/orion-spacecraft/) and the European Service Module | The deep-space capsule: mass, habitable volume (about 9 m³), 4 crew for 21 days, the service module's engine and wings (`src/studio/model/catalog.ts`) |
 | [Space Launch System](https://www.nasa.gov/humans-in-space/space-launch-system/) (Block 1) | The crew-rated Moon rocket (more than 27 t toward the Moon) |
 | [Artemis II](https://www.nasa.gov/mission/artemis-ii/) (1–10 April 2026) | The crewed mission's free-return trajectory, its length (about 10 days), the high-Earth-orbit checkout and manual piloting demonstration, the optical communications terminal (O2O), and the AVATAR organ-chip experiment |
@@ -23,11 +22,30 @@ Every number in the catalogs carries its own source note in the code (`src/studi
 | NASA Baseline Values and Assumptions Document (BVAD), NASA/TP-2015-218570 | Oxygen, water, food and carbon dioxide per crew member per day |
 | NASA Office of Inspector General reports on Artemis costs | The order of magnitude of a crewed launch's cost (estimates) |
 | NASA astronaut radiation limit (600 mSv career, NASA-STD-3001) | The scale for the crew's dose |
-| [NASA Systems Engineering Handbook](https://www.nasa.gov/reference/systems-engineering-handbook/) and NPR 7120.5: [the project life cycle](https://www.nasa.gov/reference/3-0-nasa-program-project-life-cycle/) | The game's steps (concept, design, review, build and test, operations) and the review board |
+| [NASA Systems Engineering Handbook](https://www.nasa.gov/reference/systems-engineering-handbook/) (SP-2016-6105 Rev 2) and NPR 7120.5: [the project life cycle](https://www.nasa.gov/reference/3-0-nasa-program-project-life-cycle/) | The game's steps (concept, design, review, build and test, operations), the review board, the names of NASA's reviews in the flight, the technology readiness rule and the 15%/75% cost lesson in the glossary |
+| NPR 8705.4B, Risk Classification for NASA Payloads | The risk class (A to D, by planned lifetime) on the review board |
 | NASA lessons from Kepler (K2), Galileo (high-gain antenna) and InSight (instrument leak found in testing) | The kind of problems in orbit, and why the test campaign matters; the anomaly causes are written by us |
 | [Jet Propulsion Laboratory Team X](https://jplteamx.jpl.nasa.gov/) | The concurrent-design desks |
 
-**Add here:** the NASA data you use from the challenge's Resources tab (due 13 November 2026).
+### From the challenge's Resources tab
+
+Every resource on the tab, the links we followed inside them, and what the game takes from each is in [CHALLENGE-RESOURCES.md](CHALLENGE-RESOURCES.md). In short:
+
+| Resource | How the game uses it |
+|---|---|
+| [Design and Develop Science Missions](https://www.nasa.gov/wp-content/uploads/2025/04/250323-design-and-develop-science-mission.pdf) (NASA Small Spacecraft Systems Virtual Institute, 2025) | The four mission segments (launch, space, ground, user) on the review board, and "start from the user" in the brief |
+| [General Mission Analysis Tool (GMAT)](https://software.nasa.gov/software/GSC-19468-1), NASA, Apache License 2.0 | The physical constants of the Earth, Moon and Mars (GMAT's defaults and gravity models) and the geostationary radius (`src/studio/model/types.ts`) |
+| Wessen, Borden, Ziemer and Kwok, [*Space mission concept development using concept maturity levels*](https://dataverse.jpl.nasa.gov/dataset.xhtml?persistentId=hdl:2014/44299), JPL, 2013 (CC0) | The concept-maturity checklist on the review board, the 35% point-design margins and 3 dB link margin, and the mass growth event (`src/studio/model/maturity.ts`) |
+| [Mission Design Lab](https://etd.gsfc.nasa.gov/capabilities/integrated-design-center/mission-design-lab/), NASA Goddard | Its 16 disciplines and its point-design rule, in the brief and the review board |
+| [NASA Mission Viz](https://nasa.github.io/mission-viz/) (Marshall) | The equations of the orbit view (`src/studio/ui/OrbitView.tsx`). Its code has no licence file, so none of it is used |
+| [Build It Yourself: Telescope](https://science.nasa.gov/mission/webb/game-build-it-yourself/), NASA Webb | The idea of "real missions like yours" at the end of the report |
+| [CubeSat 101](https://www3.nasa.gov/sites/default/files/atoms/files/nasa_csli_cubesat_101_508.pdf), NASA CubeSat Launch Initiative, 2017 | CubeSat schedules, the 10% reserve floor, the day-in-the-life test, the licences step, deployment and tracking after launch, the burn-wire flaw |
+| [LSP-REQ-317.01](https://www.nasa.gov/pdf/627972main_LSP-REQ-317_01A.pdf), NASA's launch rules for CubeSats (linked from CubeSat 101) | Vibration and bake-out test levels (`src/studio/model/tests.ts`) |
+| [Visualize a Space Mission Using Virtual Reality](https://www.spaceappschallenge.org/2023/challenges/visualize-a-space-mission-using-virtual-reality/) (Space Apps 2023) | Its links to GMAT and Mission Viz; its brief (concept, trajectory, timeline, free hosting) |
+
+### Real missions named in the report
+
+Short summaries of public mission pages, with links in the game: [Landsat 9](https://science.nasa.gov/mission/landsat-9/), [PUNCH](https://science.nasa.gov/mission/punch/), [Lunar Reconnaissance Orbiter](https://science.nasa.gov/mission/lro/), [CAPSTONE](https://www.nasa.gov/mission/capstone/), [Mars Reconnaissance Orbiter](https://science.nasa.gov/mission/mars-reconnaissance-orbiter/), [MAVEN](https://science.nasa.gov/mission/maven/), [MarCO](https://science.nasa.gov/mission/marco/), [Artemis I](https://www.nasa.gov/mission/artemis-i/), [Artemis II](https://www.nasa.gov/mission/artemis-ii/) and [Apollo 8](https://www.nasa.gov/mission/apollo-8/) (NASA); [Sentinel-2](https://www.esa.int/Applications/Observing_the_Earth/Copernicus/Sentinel-2/) (ESA); GhanaSat-1 (All Nations University, Ghana); ANGOSAT-2 (Angola); Queqiao and Queqiao-2 (China). No data or pictures come from them.
 
 ## Space agency partner data
 
@@ -39,6 +57,7 @@ Every number in the catalogs carries its own source note in the code (`src/studi
 | ISRO: PSLV capacity | A launcher |
 | [ESA Concurrent Design Facility](https://www.esa.int/Enabling_Support/Space_Engineering_Technology/CDF) (ESTEC) and the ESA Academy Concurrent Engineering Challenge | The concurrent-design desks and how student teams learn mission design |
 | Angola's signature of the Artemis Accords (30 November 2023) | The crewed mission's customer: an Artemis Accords partnership |
+| CSA [Digital Games and Activities](https://www.asc-csa.gc.ca/eng/youth-educators/digital-games-and-activities.asp) (the challenge's partner resource) | Reviewed (RADARSAT and OSIRIS-REx games and others); nothing from them is used |
 
 ## Other public sources
 
@@ -46,8 +65,9 @@ Every number in the catalogs carries its own source note in the code (`src/studi
 - Wertz and Larson, *Space Mission Analysis and Design* (solar cell degradation, array losses, structure fraction, hydrazine performance).
 - Vallado, *Fundamentals of Astrodynamics and Applications*, Table 8-4 (exponential atmosphere).
 - ITU-R P.618 (the shape of the rain-fade figures, which are our estimates for a tropical climate).
-- WGS-84 (Earth's size and shape); standard values for Earth's GM, J2 and rotation rate.
-- CubeSat Design Specification, [cubesat.org](https://www.cubesat.org/cubesatinfo) (6U and 12U limits).
+- NASA GMAT's default constants (see above); the Moon's and Mars's orbits and years from the NASA fact sheets.
+- [CubeSat Design Specification Rev 14.1](https://www.cubesat.org/s/CDS-REV14_1-2022-02-09.pdf) (Cal Poly, 2022): 6U and 12U mass limits, deployment timers, the propulsion rule.
+- [FCC Public Notice DA 13-445](https://docs.fcc.gov/public/attachments/DA-13-445A1.pdf) (2013): small satellite licensing times.
 
 **Launchers** (published capacities; prices and some capacities are estimates)
 - SpaceX: Falcon 9, Falcon Heavy, rideshare price list.

@@ -95,6 +95,7 @@ export function GaugeBar({ g, open }: { g: Gauge; open?: boolean }) {
         <span className="st-gauge-why">
           <span className={g.zone === 'under' ? 'on' : ''}><b>Why too little is a problem:</b> {g.under}</span>
           <span className={g.zone === 'over' ? 'on' : ''}><b>Why too much is a problem:</b> {g.over}</span>
+          {g.source && <span className="src"><b>Where this range comes from:</b> {g.source}</span>}
         </span>
       )}
     </span>

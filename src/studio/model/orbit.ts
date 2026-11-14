@@ -7,7 +7,7 @@
 import { ORBIT_TYPES, type LaunchTarget, type OrbitTypeId } from './catalog';
 import { CREW_TRIPS } from './crew';
 import type { OrbitChoice } from './design';
-import { BODIES, DEG, G0, YEAR, type Body } from './types';
+import { BODIES, DEG, G0, GEO_ALT_KM, GEO_RADIUS, YEAR, type Body } from './types';
 
 export interface OrbitFacts {
   body: Body;
@@ -122,7 +122,7 @@ export function deorbitDv(altKm: number): number {
 export function gtoToGeoDv(incDeg: number): number {
   const b = BODIES.earth;
   const rp = b.radius + 250_000;
-  const ra = 42_164_000;
+  const ra = GEO_RADIUS;
   const a = (rp + ra) / 2;
   const va = Math.sqrt(b.mu * (2 / ra - 1 / a));
   const vg = Math.sqrt(b.mu / ra);
@@ -187,13 +187,13 @@ export function orbitFacts(o: OrbitChoice): OrbitFacts {
     };
   }
   if (o.type === 'geo') {
-    const r = 42_164_000;
+    const r = GEO_RADIUS;
     const period = circularPeriodS(body, r);
-    const f = eclipseFraction(body, 35_786, 0);
+    const f = eclipseFraction(body, GEO_ALT_KM, 0);
     return {
       ...base,
-      altKm: 35_786, apoKm: 35_786, incDeg: 0, periodMin: period / 60, speedKms: Math.sqrt(body.mu / r) / 1000,
-      imagingAltKm: 35_786, imagingShare: 1,
+      altKm: GEO_ALT_KM, apoKm: GEO_ALT_KM, incDeg: 0, periodMin: period / 60, speedKms: Math.sqrt(body.mu / r) / 1000,
+      imagingAltKm: GEO_ALT_KM, imagingShare: 1,
       // shadow only within ~±22 days of each equinox, once a day
       eclipseFrac: f, eclipseMin: (f * period) / 60, eclipsesPerYear: 88,
       betaMinDeg: 0, betaRangeDeg: [0, body.obliquity / DEG],

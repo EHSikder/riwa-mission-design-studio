@@ -4,7 +4,9 @@
  */
 import { useEffect, useState } from 'react';
 import { DIFFICULTY } from '../model/design';
+import { CML_EXPLAIN, CML_NAMES, maturity, riskClass, segments, type CmlLevel } from '../model/maturity';
 import { SCENARIOS } from '../model/scenarios';
+import { listDesigns } from '../storage';
 import { RESOURCES, ROLES, type Difficulty, type ResourceId, type RoleId, type ScenarioId } from '../model/types';
 import { cleanCode, roomsAvailable } from '../net/room';
 import { useStudio } from '../state';
@@ -241,9 +243,11 @@ export function Brief() {
         <ul>{s.lessons.map((l) => <li key={l}>{l}</li>)}</ul>
         <h3>How real teams do it</h3>
         <ul>
-          <li><b>Concurrent design.</b> NASA JPL's Team X and ESA's Concurrent Design Facility put every subsystem engineer in one room, each at a station, all changing one shared model. Your desks are those stations.</li>
-          <li><b>Phases and reviews.</b> NASA's projects go concept (Phase A), preliminary design (B), final design (C), build and test (D), then operations (E), with a review board at each gate. Here: Brief, Design, Review, Build and fly.</li>
-          <li><b>Test as you fly.</b> A flaw found on the ground costs weeks; in orbit it can cost the mission. Kepler, Galileo and InSight all had to engineer around problems that tests or luck did not catch.</li>
+          <li><b>Start from the user.</b> NASA splits every mission into four segments: launch, space, ground and user. Its advice is to begin with the end in mind: who will use the data, and what do they need?</li>
+          <li><b>Concurrent design.</b> NASA JPL's Team X, Goddard's Mission Design Lab and ESA's Concurrent Design Facility put every subsystem engineer in one room, each at a station, all changing one shared model. Goddard seats 16 disciplines; your five desks share them.</li>
+          <li><b>Concept maturity.</b> JPL scores an idea from CML 1 (a sketch on a cocktail napkin) to CML 4 (a point design with margins and a cost). The review board shows the level your design reaches.</li>
+          <li><b>Phases and reviews.</b> NASA's projects go concept studies (Pre-Phase A), concept (A), preliminary design (B), final design (C), build, test and launch (D), operations (E), with a review at each gate. Here: Brief, Design, Review, Build and fly.</li>
+          <li><b>Test as you fly.</b> NASA's CubeSat 101 asks every CubeSat for a vibration test, a thermal-vacuum bake-out and a day-in-the-life test. Kepler, Galileo and InSight all had to engineer around problems that tests or luck did not catch.</li>
         </ul>
         <h3>The team</h3>
         <ul className="st-roles">
@@ -272,13 +276,50 @@ export function Review() {
   const fails = a.issues.filter((i) => i.level === 'fail');
   const missing = a.build.filter((b) => !b.done && !b.optional);
   const go = fails.length === 0;
+  const m = maturity(a, listDesigns(a.scenario.id).length);
+  const risk = riskClass(a);
   return (
     <div className="st-review">
       <header>
         <div className="st-kicker">Mission review board</div>
         <h2>{a.design.name}</h2>
-        <p className="st-sub">Before launch an independent board checks every resource and every requirement. Here is what it found.</p>
+        <p className="st-sub">NASA holds a preliminary and a critical design review before building, and a flight readiness review before launch. Here one independent board checks every resource and every requirement. Here is what it found.</p>
       </header>
+      <div className="st-segments" aria-label="The four mission segments">
+        {segments(a).map((g) => (
+          <div key={g.id} className={`st-segment ${g.id}`} title={g.explain}>
+            <span>{g.name}</span>
+            <b>{g.value}</b>
+          </div>
+        ))}
+        <div className="st-segment risk" title={risk.why}>
+          <span>NASA risk class</span>
+          <b>Class {risk.cls}</b>
+        </div>
+      </div>
+      <section className="st-cml">
+        <div className="st-cml-head">
+          <h3>Concept maturity: CML {m.level} · {m.level ? CML_NAMES[m.level] : 'not started'}</h3>
+          <p className="st-sub">JPL's scale for how ready a mission idea is. A level counts when 80% of its checks are green. Goddard's Mission Design Lab only starts a point design (CML 4) when the checklist passes.</p>
+        </div>
+        <ol className="st-cml-ladder">
+          {([1, 2, 3, 4] as CmlLevel[]).map((L) => (
+            <li key={L} className={L <= m.level ? 'on' : L === m.level + 1 ? 'next' : ''}>
+              <b>CML {L} · {CML_NAMES[L]}</b>
+              <span>{CML_EXPLAIN[L]}</span>
+              <ul>
+                {m.items.filter((i) => i.level === L).map((i) => (
+                  <li key={i.label} className={i.light}>
+                    <i aria-label={i.light} />
+                    <span>{i.label}<em>{i.note}</em></span>
+                  </li>
+                ))}
+              </ul>
+            </li>
+          ))}
+        </ol>
+        {m.next && <p className="st-cml-next">{m.next}</p>}
+      </section>
       <div className="st-review-grid">
         <section>
           <h3>Resources</h3>

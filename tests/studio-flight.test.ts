@@ -92,7 +92,7 @@ describe('after liftoff the team commissions the spacecraft', () => {
   it('unfold, listen, switch on: each step belongs to a desk', () => {
     const asked = play(fly(eo, 3, 'cadet'));
     const steps = asked.filter((e) => e.kind === 'action' && !e.id.startsWith('test:')).map((e) => `${e.id}/${e.role}`);
-    expect(steps).toEqual(['launch/director', 'deploy/spacecraft', 'signal/comms', 'firstlight/science']);
+    expect(steps).toEqual(['licence/comms', 'launch/director', 'deploy/spacecraft', 'signal/comms', 'firstlight/science']);
   });
 
   it('a wing that sticks can be worked loose, or flown as it is', () => {

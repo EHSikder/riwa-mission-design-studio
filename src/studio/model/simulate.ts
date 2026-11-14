@@ -16,7 +16,7 @@ import { GCR_MSV_PER_DAY } from './crew';
 import { DIFFICULTY } from './design';
 import {
   ANOMALIES, COMMISSIONED, CREW_ANOMALIES, CREW_ORBIT, CREW_STEPS, DEPLOY, EVENTS, FIRSTLIGHT, FLAW_ECLSS, FLAW_SOFTWARE, FLAW_THERMAL,
-  INSERTION, LAUNCH, SIGNAL, WEATHER, testStep, type Scored, type Spec,
+  INSERTION, LAUNCH, LICENCE, SIGNAL, WEATHER, testStep, type Scored, type Spec,
 } from './events';
 import { INSTRUMENTS, type InstrumentId } from './instruments';
 import { earthMarsGeometry } from './access';
@@ -132,6 +132,8 @@ export interface SimState {
   inLunarOrbit?: boolean;
   skipMoon?: boolean;
   suppliesWarned?: boolean;
+  /** Mass the parts gained beyond their estimates while being built (kg). */
+  growthKg?: number;
 }
 
 type Pending = SimEvent & { spec: Spec; scored: Scored[]; index: number };
@@ -189,6 +191,8 @@ export class MissionRun {
       }
       this.devQueue.sort((x, y) => x.month - y.month);
     }
+    // the paperwork opens it: radio, imaging and debris licences, filed as soon as the launch is booked (CubeSat 101)
+    if (!a.crew) this.devQueue.push({ month: Math.max(0.5, Math.min(2, 0.15 * a.time.devMonths)), spec: LICENCE });
     // the test campaign closes the development: each planned test in turn
     let weeksLeft = a.tests.weeks;
     for (const t of a.tests.planned) {

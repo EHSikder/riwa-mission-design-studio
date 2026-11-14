@@ -307,6 +307,28 @@
 .st-review { height: 100%; overflow-y: auto; padding: 24px 4vw 120px; }
 .st-review h2 { font-size: 34px; margin: 8px 0 4px; }
 .st-review-grid { display: grid; grid-template-columns: 1.1fr 1fr 1fr; gap: 18px; margin-top: 10px; }
+/* NASA's four segments and the risk class */
+.st-segments { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin: 14px 0 6px; }
+.st-segment { padding: 10px 12px; border-radius: 14px; background: var(--st-panel2); border: 1px solid var(--st-line); display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.st-segment span { font: 12px var(--mono); letter-spacing: 0.04em; text-transform: uppercase; color: var(--st-muted); }
+.st-segment b { font-size: 15px; color: var(--st-text); overflow-wrap: anywhere; }
+.st-segment.risk { border-style: dashed; }
+/* JPL concept maturity levels */
+.st-cml { margin: 14px 0 6px; padding: 14px 16px; border-radius: 18px; background: var(--st-panel); border: 1px solid var(--st-line); }
+.st-cml-head h3 { margin: 0 0 2px; }
+.st-cml-ladder { list-style: none; margin: 10px 0 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; align-items: start; }
+.st-cml-ladder > li { padding: 10px 12px; border-radius: 14px; border: 1px solid var(--st-line); background: rgba(255, 255, 255, 0.02); display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.st-cml-ladder > li.on { border-color: rgba(47, 212, 127, 0.5); background: rgba(47, 212, 127, 0.06); }
+.st-cml-ladder > li.next { border-color: var(--st-line2); border-style: dashed; }
+.st-cml-ladder > li > b { font-size: 15px; }
+.st-cml-ladder > li > span { font-size: 13px; color: var(--st-body); }
+.st-cml-ladder ul { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.st-cml-ladder ul li { display: grid; grid-template-columns: 12px 1fr; gap: 8px; align-items: start; font-size: 13.5px; color: var(--st-text); }
+.st-cml-ladder ul li i { width: 10px; height: 10px; border-radius: 50%; margin-top: 4px; background: var(--st-fail); }
+.st-cml-ladder ul li.green i { background: var(--st-good); }
+.st-cml-ladder ul li.yellow i { background: var(--st-warn); }
+.st-cml-ladder ul li em { display: block; font-style: normal; font-size: 12.5px; color: var(--st-muted); }
+.st-cml-next { margin: 10px 0 0; font-size: 14px; color: var(--st-body); }
 .st-review-res { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .st-review-res li { display: grid; grid-template-columns: auto auto 1fr auto; gap: 6px 8px; align-items: center; padding: 10px 13px; border-radius: 16px; background: var(--st-panel2); border: 1px solid var(--st-line); }
 .st-review-res li > span:nth-child(3) { font: 13px var(--mono); color: var(--st-muted); }
@@ -325,6 +347,8 @@
   .st-work.desk-open { grid-template-columns: 76px minmax(320px, 1fr) minmax(300px, 340px); }
   .st-work.desk-open .st-center { display: none; }
   .st-review-grid { grid-template-columns: 1fr; }
+  .st-segments { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .st-cml-ladder { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .st-brief { grid-template-columns: 1fr; }
   .st-diff-row, .st-diff-row.three { grid-template-columns: 1fr 1fr; }
 }
@@ -402,6 +426,22 @@
 .st-report-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 16px 0; }
 .st-flash { font-size: 14px; color: var(--sky); }
 .st-report-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+/* the orbit to scale (NASA Mission Viz equations) */
+.st-orbitview { margin: 10px 0 4px; padding: 8px 10px 10px; border-radius: 16px; background: rgba(4, 8, 24, 0.6); border: 1px solid var(--st-line); }
+.st-orbitview svg { display: block; width: 100%; height: auto; max-height: 240px; }
+.st-orbitview figcaption { font-size: 13.5px; line-height: 1.45; color: var(--st-body); }
+.st-ov-orbit { fill: none; stroke: rgba(255, 255, 255, 0.6); stroke-width: 1.4; stroke-dasharray: 5 4; }
+.st-ov-orbit.loop { stroke: var(--sky); stroke-dasharray: none; opacity: 0.8; }
+.st-ov-axis { stroke: rgba(255, 255, 255, 0.18); stroke-dasharray: 2 5; }
+.st-ov-bar { stroke: rgba(255, 255, 255, 0.7); stroke-width: 2; }
+.st-ov-craft { fill: #fff; filter: drop-shadow(0 0 4px rgba(96, 190, 232, 0.9)); }
+.st-ov-label { fill: var(--st-muted); font: 12px var(--mono); }
+.st-real { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+.st-real article { padding: 12px 14px; border-radius: 16px; background: var(--st-panel2); border: 1px solid var(--st-line); display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.st-real article b { font-size: 16px; }
+.st-real article p { margin: 4px 0 0; font-size: 14px; color: var(--st-body); }
+.st-real .st-real-why { color: var(--st-text); }
+.st-real a { margin-top: auto; padding-top: 6px; color: var(--sky); font-size: 14px; }
 .st-card-panel { padding: 6px 18px 16px; border-radius: 22px; background: var(--st-panel); border: 1px solid var(--st-line); min-width: 0; }
 .st-card-panel.wide { grid-column: 1 / -1; }
 .st-card-panel .st-charts { background: none; border: none; padding: 0; }
@@ -545,6 +585,10 @@
   .st-fly-craft { height: 260px; }
   .st-fly-head { flex-wrap: wrap; }
   .st-review-grid, .st-report-grid, .st-brief { grid-template-columns: minmax(0, 1fr); }
+  .st-cml-ladder { grid-template-columns: minmax(0, 1fr); }
+  .st-verdict { left: 10px; right: 10px; transform: none; flex-wrap: wrap; padding: 10px 12px; gap: 8px; }
+  .st-verdict > div { flex: 1 1 100%; margin-right: 0; }
+  .st-verdict span { font-size: 13px; }
   .st-diff-row, .st-diff-row.three, .st-scen-grid, .st-lobby-grid { grid-template-columns: minmax(0, 1fr); }
   .st-brief, .st-review, .st-report { padding-left: 14px; padding-right: 14px; }
   .st-setup-head, .st-setup-body, .st-setup-foot { padding-left: 16px; padding-right: 16px; }
@@ -625,6 +669,7 @@
 .st-gauge-why { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; font-size: 13.5px; line-height: 1.5; color: var(--st-body); }
 .st-gauge-why > span { padding: 8px 10px; border-radius: 12px; border: 1px solid var(--st-line); }
 .st-gauge-why > span.on { border-color: rgba(255, 255, 255, 0.45); background: rgba(255, 255, 255, 0.05); color: #fff; }
+.st-gauge-why > span.src { border-style: dashed; color: var(--st-dim, #a7b2cb); }
 
 /* ------------------------------------------------------------ the right side: panels that open */
 .st-right { padding: 10px 12px 24px; background: rgba(8, 12, 32, 0.86); }

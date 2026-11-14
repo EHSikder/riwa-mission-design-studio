@@ -49,14 +49,14 @@ export const PLATFORMS: Record<PlatformId, Platform> = {
     explain: 'A standard box the size of a cereal packet. Very cheap and quick, but there is little room for instruments, power or antennas.',
     structureKg: 1.5, maxMassKg: 12, slots: 1, maxPayloadKg: 4, maxArrayM2: 0.3, maxDishM: 0.3, housekeepingW: 2,
     costM: 0.15, devMonths: 9, aitMonths: 3, size: [0.1, 0.226, 0.366],
-    source: 'CubeSat Design Specification (6U ≤ 12 kg); structure and cost are typical values', estimate: true,
+    source: 'CubeSat Design Specification Rev 14.1 (2022), Table 1: a 6U may weigh at most 12 kg. NASA CubeSat 101: a CubeSat takes 9 months at the fastest, 18–24 months typically. Structure mass and cost are typical values', estimate: true,
   },
   cube12u: {
     name: '12U CubeSat', short: '12U', cubesat: true,
     explain: 'Two 6U boxes side by side. Room for a real camera and deployable solar panels, still on a small budget.',
     structureKg: 3, maxMassKg: 24, slots: 2, maxPayloadKg: 10, maxArrayM2: 0.6, maxDishM: 0.5, housekeepingW: 4,
     costM: 0.3, devMonths: 10, aitMonths: 4, size: [0.226, 0.226, 0.366],
-    source: 'CubeSat Design Specification (12U ≤ 24 kg); structure and cost are typical values', estimate: true,
+    source: 'CubeSat Design Specification Rev 14.1 (2022), Table 1: a 12U may weigh at most 24 kg. NASA CubeSat 101: 9 months at the fastest, 18–24 months typically. Structure mass and cost are typical values', estimate: true,
   },
   micro: {
     name: 'Microsatellite (≤ 180 kg)', short: 'Micro', cubesat: false,
@@ -119,7 +119,10 @@ export const AIT_COST_FRACTION = 0.15;
 export type CellId = 'gaas3j' | 'si';
 export type ArrayMountId = 'body' | 'deployed' | 'tracking';
 
-// ageing: SMAD 3rd ed. Table 11-34 (Si 3.75%/yr); multi-junction ≈ 0.5%/yr (estimate)
+// ageing: SMAD 3rd ed. Table 11-34 (Si 3.75%/yr); multi-junction ≈ 0.5%/yr (estimate).
+// NASA Small Spacecraft Technology State of the Art (power chapter): deployed panels give 40–75 W per kg and
+// body-mounted cells about 2.3–2.4 W on each 10 cm CubeSat face. With these areal masses a deployed wing lands
+// inside that range (silicon ~50 W/kg, triple-junction ~74 W/kg).
 export const CELLS: Record<CellId, Sourced & { name: string; efficiency: number; kgPerM2: number; costPerM2M: number; degradationPerYear: number; explain: string }> = {
   si: {
     name: 'Silicon', efficiency: 0.16, kgPerM2: 2.2, costPerM2M: 0.12, degradationPerYear: 0.0375,
@@ -127,9 +130,9 @@ export const CELLS: Record<CellId, Sourced & { name: string; efficiency: number;
     source: 'Space-grade Si cells ~14–17%; areal mass and cost are estimates', estimate: true,
   },
   gaas3j: {
-    name: 'Triple-junction GaAs', efficiency: 0.3, kgPerM2: 2.6, costPerM2M: 0.35, degradationPerYear: 0.005,
+    name: 'Triple-junction GaAs', efficiency: 0.3, kgPerM2: 3.0, costPerM2M: 0.35, degradationPerYear: 0.005,
     explain: 'Triple-junction gallium-arsenide cells: about twice as efficient as silicon and they age slowly, but they cost more.',
-    source: 'NASA Small Spacecraft SOA (multi-junction III-V > 30%); areal mass and cost are estimates', estimate: true,
+    source: 'NASA Small Spacecraft SOA, power chapter (multi-junction III-V cells > 30%; panels 40–75 W/kg); cost is an estimate', estimate: true,
   },
 };
 
@@ -173,7 +176,7 @@ export const ARRAY_MOUNTS: Record<ArrayMountId, ArrayMount> = {
   },
 };
 
-/** Li-ion at pack level: ~100–150 Wh/kg (cells up to 265 Wh/kg, NASA SOA); $0.5M per kWh. */
+/** Li-ion at pack level: NASA Small Spacecraft SOA gives 110–250 Wh/kg for packs; the game uses 150. $0.5M per kWh is an estimate. */
 export const BATTERY_WH_PER_KG = 150;
 export const BATTERY_COST_PER_WH_M = 0.5 / 1000;
 /** Battery cycles to failure at depth of discharge `dod` (Li-ion, trend of published test data; estimate). */
@@ -344,6 +347,9 @@ export interface Band {
   ampEfficiency: number;
 }
 
+// Data rates: NASA Small Spacecraft State of the Art, communications chapter: UHF 0.1–38.4 kbps (9.6 typical),
+// S-band 64 kbps–4 Mbps (up to 20), X-band up to 1.5 Gbps, Ka-band 25 Mbps–1 Gbps on small spacecraft, with
+// significant rain fade at Ka. The caps below sit inside those ranges; bigger spacecraft reach more at Ka.
 export const BANDS: Record<BandId, Band> = {
   UHF: { name: 'UHF (437 MHz)', explain: 'Amateur-style radio: simple antennas, but a trickle of data (kilobits per second).', freqHz: 437e6, capMbps: 0.0192, atmLossDb: 0.5, ampEfficiency: 0.3 },
   S: { name: 'S-band (2.2 GHz)', explain: 'The classic command-and-telemetry band: robust, a few megabits per second.', freqHz: 2.25e9, capMbps: 8, atmLossDb: 0.3, ampEfficiency: 0.35 },
@@ -362,7 +368,8 @@ export const ANTENNAS: Record<AntennaId, { name: string; explain: string; gainDb
 };
 
 export const DISH_EFFICIENCY = 0.55;
-/** Transmitter (amplifier and power supply), by radiated power. */
+/** Transmitter (amplifier and power supply), by radiated power. CubeSat radios radiate 0.5–5 W (27–37 dBm, NASA SOA). */
+export const CUBESAT_MAX_TX_W = 5;
 export const transmitterKg = (rfW: number) => 0.3 + 0.05 * rfW;
 export const transmitterCostM = (rfW: number) => 0.1 + 0.015 * rfW;
 
@@ -458,7 +465,7 @@ export const LAUNCHERS: Record<LauncherId, Launcher> = {
     explain: 'Buy a seat on a rocket carrying dozens of small satellites. Very cheap, but it goes where it goes: about 525 km, late-morning sun-synchronous.',
     costM: 0, reliability: 0.99, capacityKg: { sso: 830 }, altLossPer100Km: 0, fairingM: 1,
     rideshare: { pricePerKgM: 0.0065, minPriceM: 0.33, maxKg: 830, altKm: [500, 600], ltanH: [9.5, 11.5] },
-    source: 'SpaceX rideshare price list (~$6.5k/kg, 2024–25); orbit range typical of Transporter missions', estimate: true,
+    source: 'SpaceX rideshare price list (~$6.5k/kg, 2024–25); orbit range typical of Transporter missions. NASA CubeSat 101: NASA\'s CubeSat Launch Initiative pays up to $300 000 per launch, usually a 3U to low orbit; the team pays for everything else', estimate: true,
   },
   electron: {
     name: 'Electron', provider: 'Rocket Lab',

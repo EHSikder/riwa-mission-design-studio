@@ -19,6 +19,7 @@ import { TESTS, applicableTests, type TestId } from '../model/tests';
 import { ROLES, type RoleId } from '../model/types';
 import { Cards, GaugeBar, Info, Lines, Range, Section, Seg, StatusBadge, Toggle, fmt, type SectionState } from './controls';
 import { GroundTrack } from './GroundTrack';
+import { OrbitView } from './OrbitView';
 import { useSuggest } from './help';
 import { AllocationsPanel } from './team';
 
@@ -270,6 +271,7 @@ export function MissionDesk({ a, edit }: DeskProps) {
             <Seg value={d.orbit.capture} label="Capture" options={[{ value: 'propulsive', label: 'Brake with the engine' }, { value: 'aerobrake', label: 'Aerobrake (+6 months)' }]} onPick={(v) => edit((x) => { x.orbit.capture = v; })} />
           </div>
         )}
+        <OrbitView a={a} />
         <OrbitFacts a={a} />
       </Section>
       {a.scenario.body === 'earth' && (
