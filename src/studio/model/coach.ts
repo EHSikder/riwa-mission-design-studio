@@ -132,8 +132,8 @@ const TUTORIAL: CoachStep[] = [
 /** Any mission, at Cadet: the same path in bigger steps. */
 const GENERAL: CoachStep[] = [
   {
-    id: 'brief', title: 'Choose the objective',
-    text: 'Pick what the mission is for. Each objective brings its own requirements. Then press "Start designing".',
+    id: 'brief', title: 'Read the brief',
+    text: 'Who wants this mission, and why? A first objective is already picked: you can change it, and how ambitious to be, on the Mission desk. Press "Start designing".',
     done: (_, phase) => past(phase, 'brief'),
   },
   {

@@ -1,7 +1,8 @@
 /**
  * Sound effects, made in the browser with Web Audio: tones and filtered noise, nothing to download, so they
  * work offline. Every sound follows a click, which is what browsers ask for before they let a page make noise.
- * A button can name its sound with `data-sfx="add"`; any other button gets a soft tap. One switch mutes all.
+ * A button can name its sound with `data-sfx="add"`; any other button gets a soft tap. One switch mutes the
+ * effects; the music (music.ts) has its own.
  */
 import { create } from 'zustand';
 
@@ -35,7 +36,8 @@ let master: GainNode | null = null;
 let noiseBuf: AudioBuffer | null = null;
 const live = new Set<AudioScheduledSourceNode>();
 
-function audio(): AudioContext | null {
+/** The game's one audio context (the music shares it), woken up if the browser had paused it. */
+export function audio(): AudioContext | null {
   if (typeof window === 'undefined') return null;
   if (!ctx) {
     try {

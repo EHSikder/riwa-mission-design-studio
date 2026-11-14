@@ -12,10 +12,12 @@ import { cleanCode, roomsAvailable } from '../net/room';
 import { useStudio } from '../state';
 import { StatusBadge, fmt } from './controls';
 import { IssueList, ResourceIcon } from './Dashboard';
-import { ObjectivesPicker, RequirementsTable } from './desks';
+import { RequirementsTable } from './desks';
 import { GoPoll, TeamPicker, type PlayMode } from './team';
 import { Brand } from './Brand';
-import { canEdit, defaultRoles, makePlayer, ownerOf } from '../model/team';
+import { MusicButton } from './help';
+import { SkyChart } from './SkyChart';
+import { defaultRoles, makePlayer, ownerOf } from '../model/team';
 
 const ORDER: ScenarioId[] = ['tutorial', 'angola-eo', 'geo-comms', 'lunar-relay', 'mars-orbiter', 'crew-moon'];
 
@@ -84,13 +86,13 @@ export function MissionSelect() {
             ))}
           </ol>
         )}
+        <span className="st-setup-tools"><MusicButton /></span>
       </header>
 
       <div key={step} className="st-setup-body st-reveal">
         {step === 'mission' && (
           <>
             <p className="st-small-note">This game is at its best on a laptop or desktop. It works on a phone, with more scrolling.</p>
-            <div className="st-kicker">NASA Space Apps 2026 · Space Mission Design Game · team Space Underdogs</div>
             <h1>Choose your <em>mission</em>.</h1>
             <p className="st-lead">
               Start from an empty assembly stand. Build the spacecraft part by part, pick the orbit and the rocket, keep six resources
@@ -138,10 +140,6 @@ export function MissionSelect() {
                 );
               })}
             </div>
-            <p className="st-credit">
-              Earth map: NASA Blue Marble Next Generation. Stars: NASA SVS Deep Star Maps 2020. Built with AI assistance.
-              Made for NASA Space Apps 2026; not endorsed by NASA or GGPEN.
-            </p>
           </>
         )}
 
@@ -205,13 +203,16 @@ export function MissionSelect() {
   );
 }
 
+/**
+ * The customer's brief: who wants the mission, what for, and the three numbers that bound it. The goals and how
+ * ambitious to be are chosen on the Mission desk; the background (lessons, Angola's sky, how real teams work,
+ * the roles) waits in folded sections for whoever wants to read it.
+ */
 export function Brief() {
   const a = useStudio((s) => s.analysis)!;
-  const edit = useStudio((s) => s.edit);
   const setPhase = useStudio((s) => s.setPhase);
   const team = useStudio((s) => s.team);
   const s = a.scenario;
-  const director = canEdit(team, 'director');
   return (
     <div className="st-brief">
       <div className="st-brief-main">
@@ -219,52 +220,54 @@ export function Brief() {
         <h2>{s.name}</h2>
         <p className="st-brief-text">{s.brief}</p>
         <div className="st-brief-facts">
-          <span>Budget <b>{Number.isFinite(a.cost.budgetM) ? fmt.m(a.cost.budgetM) : 'unlimited'}</b></span>
-          <span>Launch by <b>{Number.isFinite(a.time.deadlineMonth) ? `month ${a.time.deadlineMonth.toFixed(0)}` : 'any time'}</b> (project starts {s.startLabel})</span>
-          <span>Critical resources <b>{s.critical.map((r) => RESOURCES[r].name).join(', ')}</b></span>
+          <div><span>Budget</span><b>{Number.isFinite(a.cost.budgetM) ? fmt.m(a.cost.budgetM) : 'Unlimited'}</b></div>
+          <div><span>Launch by</span><b>{Number.isFinite(a.time.deadlineMonth) ? `Month ${a.time.deadlineMonth.toFixed(0)}` : 'Any time'}</b><i>counting from {s.startLabel}</i></div>
+          <div><span>Critical resources</span><b className="st-brief-crit">{s.critical.map((r) => <em key={r}><ResourceIcon id={r} /> {RESOURCES[r].name}</em>)}</b></div>
         </div>
-        {!director && <p className="st-banner">The Mission Director, <b style={{ color: ownerOf(team, 'director')?.color }}>{ownerOf(team, 'director')?.name}</b>, chooses the objectives and the ambition. Talk it through together.</p>}
-        <fieldset className="st-fieldset" disabled={!director}>
-          <h3>1 · What is the mission for?</h3>
-          <ObjectivesPicker a={a} edit={(c) => edit('director', c)} />
-          <h3>2 · How ambitious?</h3>
-          <p className="st-sub">
-            For every requirement the customer names a <b>threshold</b> (the least they accept) and a <b>goal</b> (what they would love).
-            Reaching a goal you aimed for scores the most; aiming high and falling short scores less than aiming for the threshold and making it.
-          </p>
-          <RequirementsTable a={a} edit={(c) => edit('director', c)} hidePrediction />
-        </fieldset>
         <div className="st-brief-go">
-          <span>You can change the goals and the ambition later, on the Mission desk.</span>
+          <span>Next, on the Mission desk: choose the goals and how ambitious to be.</span>
           <button type="button" className="st-primary big" data-guide="go-design-main" onClick={() => setPhase('design')}>Start designing →</button>
         </div>
       </div>
-      <aside className="st-brief-side">
-        <h3>What this mission teaches</h3>
-        <ul>{s.lessons.map((l) => <li key={l}>{l}</li>)}</ul>
-        <h3>How real teams do it</h3>
-        <ul>
-          <li><b>Start from the user.</b> NASA splits every mission into four segments: launch, space, ground and user. Its advice is to begin with the end in mind: who will use the data, and what do they need?</li>
-          <li><b>Concurrent design.</b> NASA JPL's Team X, Goddard's Mission Design Lab and ESA's Concurrent Design Facility put every subsystem engineer in one room, each at a station, all changing one shared model. Goddard seats 16 disciplines; your five desks share them.</li>
-          <li><b>Concept maturity.</b> JPL scores an idea from CML 1 (a sketch on a cocktail napkin) to CML 4 (a point design with margins and a cost). The review board shows the level your design reaches.</li>
-          <li><b>Phases and reviews.</b> NASA's projects go concept studies (Pre-Phase A), concept (A), preliminary design (B), final design (C), build, test and launch (D), operations (E), with a review at each gate. Here: Brief, Design, Review, Build and fly.</li>
-          <li><b>Test as you fly.</b> NASA's CubeSat 101 asks every CubeSat for a vibration test, a thermal-vacuum bake-out and a day-in-the-life test. Kepler, Galileo and InSight all had to engineer around problems that tests or luck did not catch.</li>
-        </ul>
-        <h3>The team</h3>
-        <ul className="st-roles">
-          {(Object.keys(ROLES) as RoleId[]).map((r) => (
-            <li key={r}>
-              <span className={`st-role-chip ${r}`}>{ROLES[r].short}</span>
-              {team.mode !== 'solo' && <b style={{ color: ownerOf(team, r)?.color }}>{ownerOf(team, r)?.name} · </b>}
-              {ROLES[r].explain}
-            </li>
-          ))}
-        </ul>
-        <p className="st-sub">
-          {team.mode === 'solo'
-            ? 'Playing alone, you hold all five roles: switch desks with the tabs on the left.'
-            : 'Each role also has a secret goal, shown on its desk. They pull against each other: negotiate. Launch needs every role\'s GO.'}
-        </p>
+      <aside className="st-brief-side" aria-label="Learn more about this mission">
+        <div className="st-kicker">Learn more</div>
+        <details className="st-learn">
+          <summary>What this mission teaches</summary>
+          <ul>{s.lessons.map((l) => <li key={l}>{l}</li>)}</ul>
+        </details>
+        {s.clearSkyByMonth && (
+          <details className="st-learn">
+            <summary>Angola's sky, measured</summary>
+            <SkyChart />
+          </details>
+        )}
+        <details className="st-learn">
+          <summary>How real teams do it</summary>
+          <ul>
+            <li><b>Start from the user.</b> NASA splits every mission into four segments: launch, space, ground and user. Its advice is to begin with the end in mind: who will use the data, and what do they need?</li>
+            <li><b>Concurrent design.</b> NASA JPL's Team X, Goddard's Mission Design Lab and ESA's Concurrent Design Facility put every subsystem engineer in one room, each at a station, all changing one shared model. Goddard seats 16 disciplines; your five desks share them.</li>
+            <li><b>Concept maturity.</b> JPL scores an idea from CML 1 (a sketch on a cocktail napkin) to CML 4 (a point design with margins and a cost). The review board shows the level your design reaches.</li>
+            <li><b>Phases and reviews.</b> NASA's projects go concept studies (Pre-Phase A), concept (A), preliminary design (B), final design (C), build, test and launch (D), operations (E), with a review at each gate. Here: Brief, Design, Review, Build and fly.</li>
+            <li><b>Test as you fly.</b> NASA's CubeSat 101 asks every CubeSat for a vibration test, a thermal-vacuum bake-out and a day-in-the-life test. Kepler, Galileo and InSight all had to engineer around problems that tests or luck did not catch.</li>
+          </ul>
+        </details>
+        <details className="st-learn">
+          <summary>{team.mode === 'solo' ? 'Your five roles' : 'The team'}</summary>
+          <ul className="st-roles">
+            {(Object.keys(ROLES) as RoleId[]).map((r) => (
+              <li key={r}>
+                <span className={`st-role-chip ${r}`}>{ROLES[r].short}</span>
+                {team.mode !== 'solo' && <b style={{ color: ownerOf(team, r)?.color }}>{ownerOf(team, r)?.name} · </b>}
+                {ROLES[r].explain}
+              </li>
+            ))}
+          </ul>
+          <p className="st-sub">
+            {team.mode === 'solo'
+              ? 'Playing alone, you hold all five roles: switch desks with the tabs on the left.'
+              : 'Each role also has a secret goal, shown on its desk. They pull against each other: negotiate. Launch needs every role\'s GO.'}
+          </p>
+        </details>
       </aside>
     </div>
   );

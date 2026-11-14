@@ -27,6 +27,7 @@ import {
 import { LUNAR_SITES, REGIONS, regionArea, type RegionId } from './regions';
 import { SCENARIOS, activeRequirements, type Objective, type Requirement, type Scenario } from './scenarios';
 import { TESTS, applicableTests, type TestId } from './tests';
+import { CLEAR_DRY, CLEAR_RAINY } from './sky';
 import { DEG, RESOURCES, type Difficulty, type ResourceId, type RoleId } from './types';
 
 export type Status = 'good' | 'warn' | 'fail' | 'over';
@@ -702,8 +703,11 @@ export function analyze(d: StudioDesign, difficulty: Difficulty = 'engineer'): A
         }
         value = best;
         const inst = ins.find((i) => i.short === who);
+        // measured skies (Landsat over Angola) also tell the seasons apart
+        const seasons = s.clearSkyByMonth ? `: ${f1(raw / CLEAR_RAINY)} in the rainy months (November to March), ${f1(raw / CLEAR_DRY)} in the dry ones (May to August)` : '';
+        const clouds = s.clearSkyByMonth ? `Landsat 8 and 9 found ${REGIONS[req.region!].name} clear on ${f0(clearSky * 100)}% of passes over a year (2021 to 2025)` : `clouds clear only ${f0(clearSky * 100)}% of passes`;
         why = who
-          ? `${who} can look at a point of ${REGIONS[req.region!].name} every ${f1(raw)} days on average${inst?.cloudLimited ? `; clouds clear only ${f0(clearSky * 100)}% of passes, so ${f1(best)} days` : ' (radar sees through clouds)'}. A wider swath, agile pointing or an orbit tilted to the target shortens it.`
+          ? `${who} can look at a point of ${REGIONS[req.region!].name} every ${f1(raw)} days on average${inst?.cloudLimited ? `; ${clouds}, so a clear look every ${f1(best)} days${seasons}` : ' (radar sees through clouds)'}. A wider swath, agile pointing or an orbit tilted to the target shortens it.`
           : 'No instrument on board can look at this region.';
         break;
       }

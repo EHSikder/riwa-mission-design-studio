@@ -24,22 +24,22 @@ export function TeamPicker(props: {
   roles: Record<RoleId, string>; setRoles: (r: Record<RoleId, string>) => void; seats: Player[];
 }) {
   const { mode, names, rooms, roles, seats } = props;
-  const modes: { id: PlayMode; title: string; text: string }[] = [
+  // a copy without a room server leaves "Team online" out
+  const modes = ([
     { id: 'solo', title: 'Solo', text: 'You hold all five roles and open each desk yourself.' },
     { id: 'hotseat', title: 'Team on one screen', text: '2–4 players around one laptop or a big screen. Each desk has an owner; when you open a desk, the controls go to its owner.' },
     { id: 'host', title: 'Team online', text: 'Each player on their own computer, anywhere. You open a room and share its 4-letter code.' },
-  ];
+  ] satisfies { id: PlayMode; title: string; text: string }[]).filter((m) => m.id !== 'host' || rooms !== false);
   return (
     <div className="st-who">
-      <div className="st-diff-row three" role="radiogroup" aria-label="Players">
+      <div className={`st-diff-row ${modes.length === 3 ? 'three' : 'two'}`} role="radiogroup" aria-label="Players">
         {modes.map((m) => (
-          <button key={m.id} type="button" role="radio" aria-checked={mode === m.id} autoFocus={mode === m.id} className={mode === m.id ? 'on' : ''} disabled={m.id === 'host' && rooms === false} onClick={() => props.setMode(m.id)}>
+          <button key={m.id} type="button" role="radio" aria-checked={mode === m.id} autoFocus={mode === m.id} className={mode === m.id ? 'on' : ''} onClick={() => props.setMode(m.id)}>
             <b>{m.title}</b>
             <span>{m.text}</span>
           </button>
         ))}
       </div>
-      {rooms === false && <p className="st-sub">This copy of the game has no room server, so online rooms are off here. Use the game's Render link for online play, or “Team on one screen”.</p>}
       {mode === 'hotseat' && (
         <>
           <div className="st-names">

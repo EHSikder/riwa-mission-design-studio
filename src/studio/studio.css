@@ -90,11 +90,11 @@
 @keyframes st-rise { from { opacity: 0; transform: translateY(18px); } }
 
 /* ------------------------------------------------------------ top bar */
-.st-top { flex: none; height: 58px; display: flex; align-items: center; gap: 12px; padding: 0 16px; background: rgba(10, 15, 38, 0.72); backdrop-filter: blur(18px) saturate(140%); border-bottom: 1px solid var(--st-line); }
+.st-top { flex: none; position: relative; z-index: 19; height: 58px; display: flex; align-items: center; gap: 12px; padding: 0 16px; background: rgba(10, 15, 38, 0.72); backdrop-filter: blur(18px) saturate(140%); border-bottom: 1px solid var(--st-line); }
 .st-brand { flex: none; display: flex; flex-direction: column; gap: 2px; line-height: 1.1; margin-right: 4px; white-space: nowrap; }
 .st-brand b { font: 700 16px var(--sans); letter-spacing: 0.04em; }
 .st-brand span { font: 500 12px var(--mono); color: var(--st-muted); letter-spacing: 0.16em; text-transform: uppercase; }
-.st-name { width: 210px; background: rgba(255, 255, 255, 0.04); border: 1px solid var(--st-line2); border-radius: var(--pill); color: var(--st-text); font: 600 14.5px var(--sans); padding: 7px 14px; }
+.st-name { flex: 0 1 auto; min-width: 0; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 4px 0 4px 14px; border-left: 1px solid var(--st-line2); color: var(--st-text); font: 600 14.5px var(--sans); }
 .st-chip { font-size: 13px; padding: 3px 10px; border-radius: var(--pill); border: 1px solid var(--st-line2); white-space: nowrap; }
 .st-chip.dim { color: var(--st-muted); }
 .st-steps { display: flex; gap: 2px; margin-left: auto; }
@@ -109,12 +109,48 @@
 /* on laptops the mission name gives way first, then the difficulty chip; below that the bar scrolls sideways */
 @media (max-width: 1500px) {
   .st-top { gap: 8px; }
-  .st-name { width: auto; flex: 0 1 210px; min-width: 110px; }
+  .st-name { max-width: 200px; }
 }
 @media (max-width: 1320px) { .st-top .st-chip.dim { display: none; } }
-@media (max-width: 1240px) { .st-top { overflow-x: auto; } }
-.st-actions { display: flex; gap: 6px; margin-left: 10px; }
+.st-actions, .st-tools { display: flex; align-items: center; gap: 6px; }
+.st-actions { margin-left: 10px; }
 .st-actions button { white-space: nowrap; }
+.studio .st-music { display: inline-flex; align-items: center; justify-content: center; gap: 10px; }
+.studio .st-music.off { color: var(--st-muted); }
+
+/* the ☰ menu: on a tablet it holds the tools, on a phone the phases too */
+.st-menu-btn { display: none; }
+.studio .st-menu-btn { place-items: center; width: 42px; height: 38px; padding: 0; flex: none; }
+.st-top-menu { position: absolute; top: calc(100% + 6px); right: 10px; width: min(340px, calc(100vw - 20px)); max-height: calc(100vh - 80px); overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: 22px; background: #111833; border: 1px solid var(--st-line2); box-shadow: var(--shadow); }
+.st-menu-head { display: flex; flex-direction: column; gap: 2px; padding: 0 6px 10px; border-bottom: 1px solid var(--st-line); }
+.st-menu-head b { font-size: 16px; }
+.st-menu-head span { font-size: 13.5px; color: var(--st-muted); }
+.st-menu-steps, .st-menu-team, .studio .st-menu-go { display: none; }
+.st-menu-steps { flex-direction: column; gap: 2px; }
+.studio .st-menu-steps button, .studio .st-menu-list button { display: flex; align-items: center; justify-content: flex-start; gap: 12px; text-align: left; background: transparent; border-color: transparent; color: var(--st-body); padding: 8px 10px; border-radius: 14px; }
+.st-menu-steps button span { width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--st-line2); display: grid; place-items: center; font: 500 12.5px var(--mono); }
+.st-menu-steps .st-step-name { font-style: normal; font-size: 15px; }
+.studio .st-menu-steps button.on { color: var(--st-text); background: rgba(96, 190, 232, 0.1); border-color: rgba(96, 190, 232, 0.35); }
+.st-menu-steps button.on span { background: #fff; border-color: #fff; color: var(--ink); }
+.st-menu-steps button.done span { border-color: var(--sky); color: var(--sky); }
+.st-menu-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.st-menu-list { display: flex; flex-direction: column; gap: 2px; padding-top: 6px; border-top: 1px solid var(--st-line); }
+.st-menu-list button > span { font-size: 14.5px; }
+.st-ic { display: inline-grid; place-items: center; min-width: 20px; font-style: normal; }
+@media (max-width: 1240px) {
+  .st-top .st-tool, .st-top .st-tools { display: none; }
+  .studio .st-menu-btn { display: grid; }
+}
+@media (max-width: 1100px) { .st-top > .st-brand > span { display: none; } .st-name { max-width: 170px; } }
+@media (max-width: 760px) {
+  .st-top { gap: 6px; padding: 0 10px; }
+  .st-top > .st-actions, .st-top > .st-name, .st-top > .st-chips { display: none; }
+  .st-steps button .st-step-name, .st-steps button:not(.on) .st-step-name { display: none; }
+  .studio .st-steps button { padding: 5px 5px; }
+  .st-menu-steps { display: flex; }
+  .st-menu-team { display: block; }
+  .studio .st-menu-go { display: inline-flex; justify-content: center; }
+}
 .st-body { flex: 1; min-height: 0; position: relative; }
 
 /* ------------------------------------------------------------ workspace */
@@ -263,6 +299,8 @@
 .st-setup { height: 100%; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; }
 .st-setup-head { display: flex; align-items: center; gap: 20px; padding: 16px 6vw; }
 .st-setup-steps { display: flex; gap: 6px; margin: 0 0 0 auto; padding: 0; list-style: none; }
+.st-setup-tools { display: flex; gap: 6px; margin-left: auto; }
+.st-setup-steps + .st-setup-tools { margin-left: 0; }
 .studio .st-setup-steps button { display: inline-flex; align-items: center; gap: 8px; font: 500 12.5px var(--mono); letter-spacing: 0.16em; text-transform: uppercase; color: var(--st-muted); background: transparent; }
 .st-setup-steps span { font-size: 12.5px; }
 .studio .st-setup-steps button.on { color: var(--ink); background: #fff; border-color: #fff; }
@@ -288,27 +326,43 @@
 .st-scen-crit span { display: inline-flex; align-items: center; gap: 3px; }
 .st-diff-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
 .st-diff-row.three { grid-template-columns: repeat(3, 1fr); }
+.st-diff-row.two { grid-template-columns: repeat(2, 1fr); }
 .studio .st-diff-row button { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; text-align: left; padding: 20px 22px; min-height: 150px; border-radius: 22px; border-color: var(--st-line); background: var(--st-panel2); }
 .studio .st-diff-row button.on { border-color: var(--sky); background: rgba(96, 190, 232, 0.1); box-shadow: 0 0 0 1px var(--sky); }
 .st-diff-row b { font-size: 20px; letter-spacing: -0.02em; }
 .st-diff-row span { color: var(--st-body); font-size: 14.5px; line-height: 1.5; }
 .st-diff-row em { margin-top: auto; font: normal 13px var(--mono); color: var(--st-muted); }
 .st-who { margin-top: 4px; }
-.st-credit { margin: 22px 0 0; max-width: 780px; font-size: 13px; color: var(--st-muted); }
 .st-small-note { display: none; }
 
 /* ------------------------------------------------------------ brief */
 .st-brief { height: 100%; overflow-y: auto; display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 28px; padding: 28px 5vw 130px; }
-.st-brief h2 { font-size: 40px; margin: 8px 0 12px; }
+.st-brief h2 { font-size: clamp(40px, 4.4vw, 64px); margin: 10px 0 16px; }
+.st-brief-main { padding-top: 4vh; }
 .st-brief-text { font-size: 17px; line-height: 1.65; color: var(--st-body); max-width: 68ch; }
-.st-brief-facts { display: flex; flex-wrap: wrap; gap: 16px; margin: 14px 0 6px; font-size: 14.5px; color: var(--st-muted); }
-.st-brief-facts b { color: var(--st-text); font-family: var(--mono); font-weight: 500; }
+.st-brief-facts { display: flex; flex-wrap: wrap; gap: 12px; margin: 28px 0 0; }
+.st-brief-facts > div { display: flex; flex-direction: column; gap: 6px; min-width: 180px; padding: 16px 20px; border-radius: 20px; background: var(--st-panel2); border: 1px solid var(--st-line); }
+.st-brief-facts span { font: 500 12.5px var(--mono); letter-spacing: 0.16em; text-transform: uppercase; color: var(--st-muted); }
+.st-brief-facts b { font: 600 22px var(--sans); color: var(--st-text); }
+.st-brief-facts i { font-style: normal; font-size: 13px; color: var(--st-muted); }
+.st-brief-crit { display: flex; flex-wrap: wrap; gap: 4px 14px; }
+.st-brief-crit em { display: inline-flex; align-items: center; gap: 5px; font-style: normal; font-size: 17px; color: var(--sky); }
 .st-brief-main h3 { margin-top: 28px; color: var(--sky); }
 /* always on screen: the way on to the design desks */
-.st-brief-go { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 5; display: flex; align-items: center; gap: 16px; max-width: calc(100vw - 32px); padding: 10px 12px 10px 20px; border-radius: 22px; background: rgba(16, 22, 46, 0.86); backdrop-filter: blur(18px) saturate(140%); border: 1px solid var(--st-line2); box-shadow: var(--shadow); }
+.st-brief-go { position: fixed; bottom: 18px; left: 5vw; right: calc(5vw + 388px); width: fit-content; max-width: calc(90vw - 388px); margin: 0 auto; z-index: 5; display: flex; align-items: center; gap: 16px; max-width: calc(100vw - 32px); padding: 10px 12px 10px 20px; border-radius: 22px; background: rgba(16, 22, 46, 0.86); backdrop-filter: blur(18px) saturate(140%); border: 1px solid var(--st-line2); box-shadow: var(--shadow); }
 .st-brief-go span { font-size: 14px; color: var(--st-body); }
 .st-brief-go button { white-space: nowrap; }
-.st-brief-side { background: var(--st-panel); border: 1px solid var(--st-line); border-radius: 22px; padding: 6px 20px 20px; align-self: start; box-shadow: var(--shadow); }
+.st-brief-side { background: var(--st-panel); border: 1px solid var(--st-line); border-radius: 22px; padding: 18px 20px 6px; align-self: start; box-shadow: var(--shadow); }
+/* folded sections: closed until someone wants to read more */
+.st-learn { border-top: 1px solid var(--st-line); }
+.st-brief-side .st-kicker + .st-learn { border-top: none; margin-top: 6px; }
+.st-learn > summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 2px; font: 600 16px var(--sans); color: var(--st-text); }
+.st-learn > summary::-webkit-details-marker { display: none; }
+.st-learn > summary::after { content: ''; flex: none; width: 8px; height: 8px; margin: -4px 4px 0 0; border-right: 2px solid var(--sky); border-bottom: 2px solid var(--sky); transform: rotate(45deg); transition: transform 0.25s var(--ease); }
+.st-learn[open] > summary::after { transform: rotate(-135deg); margin-top: 4px; }
+.st-learn > summary:hover { color: var(--sky); }
+.st-learn > :not(summary) { margin-bottom: 16px; }
+.st-learn[open] > :not(summary) { animation: st-rise 0.35s var(--ease) both; }
 .st-brief-side ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 7px; font-size: 14.5px; color: var(--st-body); }
 .st-brief-side ul.st-roles { list-style: none; padding: 0; }
 
@@ -560,7 +614,9 @@
 .st-coach-foot { display: flex; align-items: center; gap: 10px; }
 .st-coach-bar { flex: 1; height: 4px; border-radius: var(--pill); background: rgba(255, 255, 255, 0.08); overflow: hidden; }
 .st-coach-bar span { display: block; height: 100%; background: var(--sky); }
-.studio .st-coach-open { position: absolute; right: 376px; top: 72px; z-index: 15; border-color: var(--sky); }
+.studio .st-coach-open { position: absolute; right: 18px; bottom: 18px; top: auto; z-index: 15; border-color: var(--sky); }
+/* on the brief the guide opens where its button was, clear of the start bar */
+.st-coach.phase-brief { top: auto; right: 18px; bottom: 18px; }
 .studio .st-rail-btn.coach { animation: st-pulse 1.8s ease-in-out infinite; color: var(--st-text); }
 @keyframes st-pulse { 50% { box-shadow: inset 0 0 0 2px var(--sky), 0 0 14px rgba(96, 190, 232, 0.4); } }
 .st-glossary { width: min(760px, 94vw); max-height: 84vh; display: flex; flex-direction: column; padding: 20px 24px; border-radius: 26px; background: var(--st-raise); border: 1px solid var(--st-line2); box-shadow: var(--shadow); }
@@ -575,7 +631,10 @@
 }
 @media (max-width: 1240px) {
   .st-coach, .studio .st-coach-open { right: 16px; top: auto; bottom: 16px; }
+  /* the review's verdict bar has the bottom: the guide moves up under the top bar */
+  .st-coach.phase-review { top: 70px; bottom: auto; }
 }
+@media (max-width: 1000px) { .studio .st-coach-open.phase-review { top: 70px; bottom: auto; } }
 
 /* a room lost to a server restart */
 .st-lost { padding: 8px 14px; background: rgba(229, 56, 59, 0.16); border-bottom: 1px solid var(--st-fail); text-align: center; font-weight: 600; }
@@ -583,8 +642,6 @@
 /* Phones and small tablets: one column you scroll, and a top bar that scrolls sideways. The game is at its best on a laptop. */
 @media (max-width: 760px) {
   .st-small-note { display: block; margin: 0 0 14px; padding: 9px 14px; border: 1px solid var(--st-line2); border-radius: 16px; font-size: 14px; color: var(--st-body); }
-  .st-top { overflow-x: auto; }
-  .st-top > * { flex: none; }
   .st-work, .st-work.desk-open, .st-fly { display: block; height: 100%; overflow-y: auto; }
   .st-work .st-center, .st-work.desk-open .st-center { display: grid; height: 56vh; }
   .st-left { display: block; }
@@ -596,12 +653,16 @@
   .st-review-grid, .st-report-grid, .st-brief { grid-template-columns: minmax(0, 1fr); }
   .st-cml-ladder { grid-template-columns: minmax(0, 1fr); }
   .st-verdict { left: 10px; right: 10px; transform: none; flex-wrap: wrap; padding: 10px 12px; gap: 8px; }
-  .st-brief-go { left: 10px; right: 10px; transform: none; padding: 8px; }
+  .st-brief-go { left: 10px; right: 10px; width: auto; max-width: none; margin: 0; padding: 8px; }
+  .studio .st-coach-open { right: 10px; bottom: 12px; }
+  .studio .st-coach-open.phase-brief { bottom: 96px; }
+  .st-coach.phase-brief { bottom: 96px; }
+  .st-setup-head > .st-setup-tools { margin-left: auto; }
   .st-brief-go span { display: none; }
   .st-brief-go button { flex: 1; }
   .st-verdict > div { flex: 1 1 100%; margin-right: 0; }
   .st-verdict span { font-size: 13px; }
-  .st-diff-row, .st-diff-row.three, .st-scen-grid, .st-lobby-grid { grid-template-columns: minmax(0, 1fr); }
+  .st-diff-row, .st-diff-row.three, .st-diff-row.two, .st-scen-grid, .st-lobby-grid { grid-template-columns: minmax(0, 1fr); }
   .st-brief, .st-review, .st-report { padding-left: 14px; padding-right: 14px; }
   .st-setup-head, .st-setup-body, .st-setup-foot { padding-left: 16px; padding-right: 16px; }
   .st-setup-steps { display: none; }
@@ -749,7 +810,7 @@
 .st-coach .st-kicker { color: var(--st-good); }
 .st-coach b { font-size: 17px; }
 .st-coach p { font-size: 14.5px; }
-.st-coach.phase-brief, .st-coach.phase-review, .st-coach.phase-report { right: 24px; }
+.st-coach.phase-brief, .st-coach.phase-review, .st-coach.phase-report { right: 18px; }
 .st-coach.phase-fly { right: 340px; top: auto; bottom: 200px; }
 
 /* ------------------------------------------------------------ setup screens */
@@ -882,8 +943,7 @@
 
 /* the top bar on a laptop: the brief already names the mission, so its chips step aside first */
 @media (max-width: 1500px) { .st-top > .st-chip { display: none; } .st-brand i { display: none; } }
-@media (max-width: 1400px) { .st-top .st-actions { margin-left: 4px; gap: 4px; } .studio .st-top .st-actions button { padding: 6px 10px; } }
-.st-coach.phase-brief { top: auto; bottom: 20px; }
+@media (max-width: 1400px) { .st-top .st-actions, .st-top .st-tools { margin-left: 4px; gap: 4px; } .studio .st-top .st-actions button { padding: 6px 10px; } }
 
 /* the change card sits above the spacecraft's caption */
 .st-change { bottom: 92px; }
@@ -892,3 +952,23 @@
 .st-launch-earth { position: absolute; left: -60vw; width: 220vw; height: 220vw; top: 100%; border-radius: 50%; background: radial-gradient(circle at 50% 8%, #4b9ad6 0%, #175195 14%, #0b2a5c 30%, #06142e 55%); box-shadow: 0 0 60px 18px rgba(96, 190, 232, 0.55), inset 0 30px 60px rgba(160, 220, 255, 0.35); transition: transform 3s var(--ease); }
 .st-launch.orbit .st-launch-earth { transform: translateY(-34vh); }
 .st-launch.orbit .st-launch-rocket { transform: translateY(-14vh) scale(0.42) rotate(72deg); }
+
+/* Angola's sky, measured by Landsat 8 and 9 (brief and Payload desk) */
+.st-sky { margin: 4px 0 6px; }
+.st-sky svg { display: block; width: 100%; height: auto; }
+.st-sky .clear { fill: var(--sky); }
+.st-sky .cloud { fill: rgba(255, 255, 255, 0.13); }
+.st-sky text { font: 500 12px var(--mono); fill: var(--st-muted); }
+.st-sky text.val { fill: var(--st-text); }
+.st-sky .avg { stroke: #fff; stroke-width: 1; stroke-dasharray: 4 4; opacity: 0.75; }
+.st-sky figcaption { margin-top: 6px; font-size: 13.5px; line-height: 1.5; color: var(--st-muted); }
+
+/* phones: the guide card spans the screen, whatever the phase */
+@media (max-width: 760px) {
+  .st-coach, .st-coach.phase-brief, .st-coach.phase-review, .st-coach.phase-report, .st-coach.phase-fly { left: 10px; right: 10px; width: auto; }
+}
+@media (max-width: 760px) {
+  .st-brief-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .st-brief-facts > div { min-width: 0; }
+  .st-brief-facts > div:last-child { grid-column: 1 / -1; }
+}

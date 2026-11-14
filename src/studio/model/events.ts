@@ -14,6 +14,7 @@ import { ADCS, COMPUTERS, LAUNCHERS, PLATFORMS, PROPULSION, STATIONS } from './c
 import { SHELTERS } from './crew';
 import { INSTRUMENTS, type InstrumentId } from './instruments';
 import type { EventOption, MissionRun, Reading, SimEvent, SimState } from './simulate';
+import { CLEAR_RAINY, MONTHS, monthOf, pct } from './sky';
 import { DEFECTS, TESTS, foundText, type DefectId, type TestId } from './tests';
 import { G0, MARS_YEAR_DAYS, type RoleId } from './types';
 
@@ -242,10 +243,13 @@ export const EVENTS: Spec[] = [
     resolve: (r, o) => {
       if (o !== 'retask') return 'The request went to another satellite operator.';
       const sar = r.a.design.instruments.includes('sar') && (r.st.health.sar ?? 0) > 0.3;
-      const ok = sar || r.rng.next() < (r.a.design.adcs === 'agile' ? 0.7 : r.a.design.instruments.includes('msWide') ? 0.5 : 0.15) * (r.a.scenario.clearSky ?? 1) * 1.6;
+      // floods come in the rainy months, when Landsat finds Angola clear far less often than over a year
+      const measured = !!r.a.scenario.clearSkyByMonth;
+      const sky = measured ? CLEAR_RAINY : (r.a.scenario.clearSky ?? 1);
+      const ok = sar || r.rng.next() < (r.a.design.adcs === 'agile' ? 0.7 : r.a.design.instruments.includes('msWide') ? 0.5 : 0.15) * sky * 1.6;
       r.st.safeDays += 0.3;
       if (ok) { r.st.bonus[r.a.design.primary] = (r.st.bonus[r.a.design.primary] ?? 0) + 0.05; return 'Images delivered in time: rescue teams used them to reach three cut-off villages.'; }
-      return sar ? 'Re-tasked, but the radar could not reach the valley in time.' : 'Clouds hid the valley on the only pass: no usable image.';
+      return sar ? 'Re-tasked, but the radar could not reach the valley in time.' : `Clouds hid the valley on the only pass: no usable image.${measured ? ` In the rainy months Landsat 8 and 9 find Angola clear on only ${pct(CLEAR_RAINY)} of passes.` : ''}`;
     },
     lesson: 'Radar sees through the storm clouds that come with floods; a camera often cannot.',
   },
@@ -500,10 +504,20 @@ export const FIRSTLIGHT: Spec = {
   options: () => [{ id: 'go', label: 'Switch on the payload', explain: 'One instrument at a time, checking each against its ground test data.', quality: 1 }],
   resolve: (r) => {
     const hurt = (Object.keys(r.st.health) as InstrumentId[]).filter((id) => (r.st.health[id] ?? 1) < 1);
-    return hurt.length ? `The payload is on. ${hurt.map((id) => INSTRUMENTS[id].short).join(', ')} is not what it was on the ground: ${hurt.map((id) => `${Math.round((r.st.health[id] ?? 1) * 100)}%`).join(', ')} of its quality.` : 'The payload is on and its first data match the ground tests.';
+    return (hurt.length ? `The payload is on. ${hurt.map((id) => INSTRUMENTS[id].short).join(', ')} is not what it was on the ground: ${hurt.map((id) => `${Math.round((r.st.health[id] ?? 1) * 100)}%`).join(', ')} of its quality.` : 'The payload is on and its first data match the ground tests.') + firstPicture(r);
   },
   lesson: 'Commissioning compares the spacecraft in orbit with the one that was tested: any difference is a clue.',
 };
+
+/** A camera's first look at Angola meets the season: how clear Landsat 8 and 9 usually find Angola in that month. */
+function firstPicture(r: MissionRun): string {
+  const sky = r.a.scenario.clearSkyByMonth;
+  if (!sky || !r.a.design.instruments.some((id) => INSTRUMENTS[id].cloudLimited)) return '';
+  const m = monthOf(r.st.launchMonth + Math.max(0, r.st.day) / 30.44);
+  return sky[m] < 0.6
+    ? ` It is ${MONTHS[m]}, the rainy season: Landsat 8 and 9 find only ${pct(sky[m])} of Angola clear in ${MONTHS[m]}, so the first pictures are mostly cloud. Radar would not care.`
+    : ` It is ${MONTHS[m]}: Landsat 8 and 9 find ${pct(sky[m])} of Angola clear in ${MONTHS[m]}, so the first pictures show the ground.`;
+}
 
 export const COMMISSIONED: Spec = {
   ...scripted, id: 'arrive', title: 'In the operating orbit', kind: 'milestone',

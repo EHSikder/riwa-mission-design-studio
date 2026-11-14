@@ -4,7 +4,7 @@
  * - The mission guide (tutorial and Guided): a light that sits on the very button to press next, and a
  *   "Suggested" mark on a choice that works, taken from the mission's reference design. No AI: the same rules
  *   the coach checks, pointed at the screen.
- * - The glossary, the text size and the sound switch. Preferences stay in this browser.
+ * - The glossary, the text size, and the switches for the sound effects and the music. Preferences stay in this browser.
  */
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -15,6 +15,7 @@ import type { StudioDesign } from '../model/design';
 import { GLOSSARY } from '../model/glossary';
 import { ROLES } from '../model/types';
 import { useStudio, type Phase } from '../state';
+import { useMusic } from './music';
 import { useSound } from './sound';
 
 const KEY = 'underdogs.studio.help';
@@ -205,17 +206,35 @@ export function Glossary() {
   );
 }
 
-/** Glossary, sound and text-size buttons for the top bar. */
-export function HelpButtons() {
+/** The music switch: a note, crossed out while the music is off. `labeled` adds the words (for the menu). */
+export function MusicButton({ labeled = false }: { labeled?: boolean }) {
+  const on = useMusic((s) => s.on);
+  const toggle = useMusic((s) => s.toggle);
+  return (
+    <button type="button" className={`st-music ${on ? '' : 'off'}`} onClick={toggle} title={on ? 'Music is on' : 'Music is off'} aria-label={labeled ? undefined : on ? 'Turn the music off' : 'Turn the music on'} aria-pressed={on}>
+      <svg className="st-ic" viewBox="0 0 20 20" width="18" height="18" aria-hidden>
+        <path d="M7.5 15V4.6l9-2.1V13" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
+        <circle cx="5.2" cy="15" r="2.4" fill="currentColor" />
+        <circle cx="14.2" cy="13" r="2.4" fill="currentColor" />
+        {!on && <path d="M2.5 2.5l15 15" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />}
+      </svg>
+      {labeled && <span>{on ? 'Music on' : 'Music off'}</span>}
+    </button>
+  );
+}
+
+/** Glossary, sound-effects and text-size buttons for the top bar; `labeled` adds the words (for the menu). */
+export function HelpButtons({ labeled = false, onGlossary }: { labeled?: boolean; onGlossary?: () => void }) {
   const scale = useHelp((s) => s.scale);
   const set = useHelp((s) => s.set);
   const muted = useSound((s) => s.muted);
   const toggle = useSound((s) => s.toggle);
+  const size = `${Math.round(scale * 100)}%`;
   return (
     <>
-      <button type="button" onClick={() => set({ glossary: true })} title="Glossary: the words of mission design" aria-label="Open the glossary">?</button>
-      <button type="button" onClick={toggle} title={muted ? 'Sound is off' : 'Sound is on'} aria-label={muted ? 'Turn the sound on' : 'Turn the sound off'} aria-pressed={!muted}>{muted ? '🔇' : '🔊'}</button>
-      <button type="button" onClick={() => set({ scale: SCALES[(SCALES.indexOf(scale) + 1) % SCALES.length] })} title="Text size" aria-label={`Text size ${Math.round(scale * 100)}%`}>A{scale > 1 ? '+' : ''}{scale > 1.2 ? '+' : ''}</button>
+      <button type="button" onClick={() => { set({ glossary: true }); onGlossary?.(); }} title="Glossary: the words of mission design" aria-label={labeled ? undefined : 'Open the glossary'}><span className="st-ic">?</span>{labeled && <span>Glossary</span>}</button>
+      <button type="button" onClick={toggle} title={muted ? 'Sound effects are off' : 'Sound effects are on'} aria-label={labeled ? undefined : muted ? 'Turn the sound effects on' : 'Turn the sound effects off'} aria-pressed={!muted}><span className="st-ic">{muted ? '🔇' : '🔊'}</span>{labeled && <span>{muted ? 'Sound effects off' : 'Sound effects on'}</span>}</button>
+      <button type="button" onClick={() => set({ scale: SCALES[(SCALES.indexOf(scale) + 1) % SCALES.length] })} title="Text size" aria-label={labeled ? undefined : `Text size ${size}`}><span className="st-ic">A{scale > 1 ? '+' : ''}{scale > 1.2 ? '+' : ''}</span>{labeled && <span>Text size {size}</span>}</button>
     </>
   );
 }

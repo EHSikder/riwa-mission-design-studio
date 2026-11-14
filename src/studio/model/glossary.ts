@@ -2,6 +2,8 @@
  * The studio's glossary (docs/03 §9): the words of mission design, each in a sentence or two a 14-year-old can
  * follow, with why it matters to the mission. Plain words first, the jargon in brackets.
  */
+import { CLEAR_BY_MONTH, CLEAR_YEAR, CLEAREST, CLOUDIEST, MONTHS, pct } from './sky';
+
 export interface Term {
   term: string;
   plain: string;
@@ -23,6 +25,7 @@ export const GLOSSARY: Term[] = [
   { term: 'Ground resolution (pixel size)', plain: 'The size on the ground of one pixel of an image (ground sample distance).', why: '30 m pixels show fields; 1 m pixels show cars. Sharper cameras see a narrower strip.' },
   { term: 'Swath', plain: 'The width of the strip of ground an instrument sees as it flies.', why: 'A wider swath covers a country faster and comes back to each place more often.' },
   { term: 'Revisit time', plain: 'How long until the spacecraft can look at the same place again.', why: 'Floods and crops change in days: a slow revisit misses them. Clouds make it longer.' },
+  { term: 'Clear sky', plain: `The chance that a place is free of cloud when a camera passes over. Landsat 8 and 9 found Angola clear ${pct(CLEAR_YEAR)} of the time over a year: ${pct(CLEAR_BY_MONTH[CLOUDIEST])} in ${MONTHS[CLOUDIEST]}, ${pct(CLEAR_BY_MONTH[CLEAREST])} in ${MONTHS[CLEAREST]}.`, why: 'A camera needs it, radar does not. In the rainy months a camera needs about twice as many passes to get one clear look.' },
   { term: 'Data rate', plain: 'How many bits per second a radio link carries (kbps, Mbps, Gbps).', why: 'Instruments make data faster than most links can send it: the link decides what reaches the ground.' },
   { term: 'Link budget', plain: 'The sum of radio gains and losses between the spacecraft and the ground: transmitter power, antennas, distance, receiver.', why: 'It tells you the data rate. Twice the distance means a quarter of the signal.' },
   { term: 'Ground station contact', plain: 'The minutes a satellite is above a ground station\'s horizon and can talk to it.', why: 'Low-orbit satellites only reach a station a few times a day, for a few minutes each time.' },

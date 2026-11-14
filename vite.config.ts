@@ -15,7 +15,7 @@ export default defineConfig({
     },
   ],
   // three.js makes one large chunk; expected for a game with a 3D view
-  build: { chunkSizeWarningLimit: 1600 },
+  build: { chunkSizeWarningLimit: 1700 },
   test: {
     include: ['tests/**/*.test.ts'],
   },

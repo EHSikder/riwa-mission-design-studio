@@ -10,6 +10,7 @@ Every number in the catalogs carries its own source note in the code (`src/studi
 |---|---|
 | [Blue Marble Next Generation](https://visibleearth.nasa.gov/collection/1484/blue-marble) (July, `world.topo.bathy.200407`) | The Earth map under every ground track, resized to 4096 × 2048 (`public/assets/textures/earth_day_4k.jpg`) |
 | [Deep Star Maps 2020](https://svs.gsfc.nasa.gov/4851), NASA Scientific Visualization Studio | The star background, resized to 2048 × 1024 (`public/assets/textures/stars_2k.jpg`) |
+| [Landsat 8 and 9 Collection 2 Level-2](https://planetarycomputer.microsoft.com/dataset/landsat-c2-l2) (NASA and USGS), read through the Microsoft Planetary Computer's STAC API (free, no account) | How clear Angola's sky is, month by month: the land cloud cover (`landsat:cloud_cover_land`) of 13,482 scenes over Angola from 2021 to 2025. `scripts/landsat-sky.mjs` (`npm run sky`) fetches them and writes `src/studio/model/angolaSky.ts`. Used for a camera's clear revisit and coverage, the flood response and first light. Landsat data from USGS are in the public domain |
 | [Mars Reconnaissance Orbiter](https://science.nasa.gov/mission/mars-reconnaissance-orbiter/): HiRISE, CTX, CRISM, Mars Climate Sounder, SHARAD | Resolution, swath, mass and power of the Mars instruments, and the size of the Mars platform |
 | [Lunar Reconnaissance Orbiter](https://science.nasa.gov/mission/lro/): LROC narrow-angle camera | The lunar camera |
 | [MAVEN](https://science.nasa.gov/mission/maven/): imaging ultraviolet spectrograph, magnetometer (with Mars Global Surveyor) | The Mars atmosphere and magnetic-field instruments, as class references |
@@ -126,8 +127,8 @@ The server (`server/`) uses only Node.js itself.
 
 ## AI tools
 
-Claude Code (Anthropic), a code generation assistant. It wrote the code, tests and documents under the team's direction. The sound effects are synthesized in the browser by that code (oscillators and filtered noise, Web Audio), not recordings or AI audio files. The game contains no AI-generated images or video, and no AI-generated content uses NASA branding.
+Claude Code (Anthropic), a code generation assistant. It wrote the code, tests and documents under the team's direction. The sound effects and the background music are synthesized in the browser by that code (oscillators and filtered noise, Web Audio), not recordings or AI audio files. The game contains no AI-generated images or video, and no AI-generated content uses NASA branding.
 
 ## Our own work
 
-The game's design, code, text, 3D spacecraft (built from code, with no model files), launch animation (SVG and CSS) and sound effects (Web Audio code) were created for this project and are released under the Apache License 2.0. The Moon and Mars surfaces in the 3D view are drawn by code; the Earth is NASA's Blue Marble.
+The game's design, code, text, 3D spacecraft (built from code, with no model files), launch animation (SVG and CSS), sound effects and music (Web Audio code) were created for this project and are released under the Apache License 2.0. The Moon and Mars surfaces in the 3D view are drawn by code; the Earth is NASA's Blue Marble.

@@ -10,6 +10,7 @@ import type { InstrumentId } from './instruments';
 import type { RegionId } from './regions';
 import type { TestId } from './tests';
 import type { BodyId, ResourceId, ScenarioId } from './types';
+import { CLEAR_BY_MONTH, CLEAR_YEAR } from './sky';
 
 export type MetricId =
   | 'gsd' | 'revisit' | 'mapped' | 'latency' | 'lifetime' | 'capacity' | 'availability' | 'service'
@@ -71,8 +72,10 @@ export interface Scenario {
   startLabel: string;
   /** The two or three resources that decide this mission. */
   critical: ResourceId[];
-  /** Fraction of passes with a clear sky over the target (optical imaging). */
+  /** Chance that the target is clear on one pass of a camera, over a year (Angola: measured by Landsat, sky.ts). */
   clearSky?: number;
+  /** The same, month by month (0 = January), when it was measured. */
+  clearSkyByMonth?: readonly number[];
   /** Lander radios on the lunar surface the relay must hear. */
   landers?: { S: { txW: number; gainDbi: number }; X: { txW: number; gainDbi: number } };
   /** Cadet-only tutorial. */
@@ -143,7 +146,8 @@ const TUTORIAL: Scenario = {
   opsPerYearM: 0.1,
   startLabel: 'January 2027',
   critical: ['power', 'data', 'budget'],
-  clearSky: 0.55,
+  clearSky: CLEAR_YEAR,
+  clearSkyByMonth: CLEAR_BY_MONTH,
   lessons: [
     'A camera is useless without a way to send its pictures home: data rate decides what you get.',
     'Solar panels only work in sunlight; the battery carries the satellite through every eclipse.',
@@ -230,7 +234,8 @@ const ANGOLA_EO: Scenario = {
   opsPerYearM: 1.2,
   startLabel: 'January 2027',
   critical: ['data', 'budget', 'power'],
-  clearSky: 0.55,
+  clearSky: CLEAR_YEAR,
+  clearSkyByMonth: CLEAR_BY_MONTH,
   lessons: [
     'Resolution, swath and revisit fight each other: a sharper camera sees a narrower strip, so it comes back less often.',
     'Clouds cover Angola for much of the rainy season: radar sees through them, but costs power and money.',

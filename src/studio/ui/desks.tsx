@@ -20,6 +20,7 @@ import { ROLES, type RoleId } from '../model/types';
 import { Cards, GaugeBar, Info, Lines, Range, Section, Seg, StatusBadge, Toggle, fmt, numText, type SectionState } from './controls';
 import { GroundTrack } from './GroundTrack';
 import { OrbitView } from './OrbitView';
+import { SkyChart } from './SkyChart';
 import { useSuggest } from './help';
 import { AllocationsPanel } from './team';
 
@@ -567,6 +568,11 @@ export function PayloadDesk({ a, edit }: DeskProps) {
           })}
         />
       </Section>
+      {s.clearSkyByMonth && (
+        <Section id="sky" title="Angola's sky" right={`${Math.round((s.clearSky ?? 1) * 100)}% clear over a year`} info="A camera needs a clear sky; radar does not. Landsat 8 and 9 measured how much of Angola is clear, month by month: the game's coverage and revisit use it.">
+          <SkyChart />
+        </Section>
+      )}
       {a.data.instruments.some((u) => u.gbitPerDay > 0) && (
         <Section id="data" title="Data each instrument makes" right={`${a.data.generatedGbitDay.toFixed(1)} Gbit/day`} info="Instruments only work over your targets (Earth) or as much as the link can carry home (deep space).">
           <Lines lines={a.data.instruments.map((u) => ({ name: `${u.name} (${(u.duty * 100).toFixed(u.duty < 0.01 ? 2 : 1)}% of the time)`, value: u.gbitPerDay }))} format={(v) => `${v.toFixed(1)} Gbit/day`} />
