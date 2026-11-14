@@ -230,7 +230,6 @@ export const COMPUTERS: Record<ComputerId, Computer> = {
   },
 };
 
-export const STORAGE_STEPS_GBIT = [8, 32, 128, 512, 2_048, 8_192] as const;
 // zero storage is "not fitted yet": it weighs and costs nothing
 export const storageKg = (gbit: number) => (gbit > 0 ? 0.1 + 0.0004 * gbit : 0);
 export const storageW = (gbit: number) => (gbit > 0 ? 1 + 0.0015 * gbit : 0);

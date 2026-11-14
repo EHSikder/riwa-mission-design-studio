@@ -4,7 +4,7 @@
  * to run on every pixel of a drag), an "i" button with a plain-language explanation, status badges that carry
  * an icon and a word (never colour alone), and the sweet-spot gauge: too little, just right, more than needed.
  */
-import { useEffect, useId, useState, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import type { Gauge, Status } from '../model/analyze';
 import { useStudio } from '../state';
 
@@ -171,55 +171,145 @@ export function Seg<T extends string | number>(props: { value: T; options: { val
   );
 }
 
+/** A number as people write it: no float noise, up to six significant digits. */
+export const numText = (v: number) => (Number.isFinite(v) ? String(Number(v.toPrecision(6))) : '');
+
+/** A number box that takes any value as typed, and commits on Enter or when it loses focus (Esc restores). */
+export function NumberBox(props: { value: number; onCommit: (v: number) => void; label: string; min?: number; max?: number; disabled?: boolean }) {
+  const [text, setText] = useState(numText(props.value));
+  const typing = useRef(false);
+  const cancel = useRef(false);
+  useEffect(() => { if (!typing.current) setText(numText(props.value)); }, [props.value]);
+  const done = () => {
+    typing.current = false;
+    if (cancel.current) { cancel.current = false; setText(numText(props.value)); return; }
+    const v = Number(text.trim().replace(',', '.'));
+    if (text.trim() === '' || !Number.isFinite(v)) { setText(numText(props.value)); return; }
+    const c = Math.min(props.max ?? Infinity, Math.max(props.min ?? -Infinity, v));
+    setText(numText(c));
+    if (c !== props.value) props.onCommit(c);
+  };
+  return (
+    <input
+      type="number"
+      inputMode="decimal"
+      step="any"
+      min={props.min}
+      max={props.max}
+      aria-label={props.label}
+      disabled={props.disabled}
+      value={text}
+      onFocus={(e) => { typing.current = true; e.currentTarget.select(); }}
+      onChange={(e) => setText(e.target.value)}
+      onBlur={done}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') e.currentTarget.blur();
+        if (e.key === 'Escape') { cancel.current = true; e.currentTarget.blur(); }
+      }}
+    />
+  );
+}
+
+/** Positions on the slider track: fine enough that a drag never jumps between round numbers. */
+const TRACK = 2000;
+
 /**
- * A slider that shows its value live while dragging and commits on release. `log` spreads values that span
- * orders of magnitude (battery, transmitter power).
+ * A number with a slider and a box to type it in. Dragging moves in fine steps (three significant figures on a
+ * log scale, a two-thousandth of the range otherwise); typing takes any value between `min` and `max`, exactly
+ * as written. The slider shows its value live and commits on release; the box commits on Enter or when it loses
+ * focus (Esc puts the old value back). `log` spreads values that span orders of magnitude (battery, transmitter
+ * power, storage).
  */
 export function Range(props: {
   label: string;
   value: number;
   min: number;
   max: number;
-  step?: number;
+  /** The unit written after the number box ("km", "%", "m²"). */
+  unit: string;
   log?: boolean;
-  format: (v: number) => string;
+  /** Extra words about the value: a cost, a direction, a time of day. */
+  note?: (v: number) => ReactNode;
   onCommit: (v: number) => void;
   info?: ReactNode;
   extra?: ReactNode;
   disabled?: boolean;
 }) {
   const id = useId();
+  const { min, max, log } = props;
   const [live, setLive] = useState(props.value);
-  useEffect(() => setLive(props.value), [props.value]);
-  const toPos = (v: number) => (props.log ? Math.log(v / props.min) / Math.log(props.max / props.min) : (v - props.min) / (props.max - props.min));
+  const [text, setText] = useState(numText(props.value));
+  const typing = useRef(false);
+  const cancel = useRef(false);
+  useEffect(() => {
+    setLive(props.value);
+    if (!typing.current) setText(numText(props.value));
+  }, [props.value]);
+  const clamp = (v: number) => Math.min(max, Math.max(min, v));
+  const toPos = (v: number) => (log ? Math.log(v / min) / Math.log(max / min) : (v - min) / (max - min));
   const fromPos = (p: number) => {
-    const v = props.log ? props.min * (props.max / props.min) ** p : props.min + p * (props.max - props.min);
-    const st = props.step ?? 0;
-    return st ? Math.round(v / st) * st : v;
+    const v = log ? min * (max / min) ** p : min + p * (max - min);
+    if (log) return clamp(Number(v.toPrecision(3)));
+    const res = 10 ** Math.floor(Math.log10((max - min) / TRACK));
+    return clamp(Number((Math.round(v / res) * res).toPrecision(12)));
   };
-  const commit = () => {
-    if (live !== props.value) props.onCommit(live);
+  const commit = (v: number) => {
+    const c = clamp(v);
+    setLive(c);
+    setText(numText(c));
+    if (c !== props.value) props.onCommit(c);
+  };
+  const typed = () => {
+    typing.current = false;
+    if (cancel.current) { cancel.current = false; setText(numText(props.value)); setLive(props.value); return; }
+    const v = Number(text.trim().replace(',', '.'));
+    if (text.trim() === '' || !Number.isFinite(v)) { setText(numText(live)); return; }
+    commit(v);
   };
   return (
     <div className="st-range">
       <div className="st-range-head">
         <label htmlFor={id}>{props.label}</label>
         {props.info && <Info text={props.info} />}
-        <span className="st-range-value">{props.format(live)}</span>
+        <span className="st-range-value">
+          <input
+            type="number"
+            inputMode="decimal"
+            step="any"
+            min={min}
+            max={max}
+            aria-label={`${props.label}, in ${props.unit}`}
+            disabled={props.disabled}
+            value={text}
+            onFocus={(e) => { typing.current = true; e.currentTarget.select(); }}
+            onChange={(e) => setText(e.target.value)}
+            onBlur={typed}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') e.currentTarget.blur();
+              if (e.key === 'Escape') { cancel.current = true; e.currentTarget.blur(); }
+            }}
+          />
+          <em>{props.unit}</em>
+        </span>
       </div>
       <input
         id={id}
         type="range"
         min={0}
-        max={1000}
+        max={TRACK}
         step={1}
         disabled={props.disabled}
-        value={Math.round(Math.max(0, Math.min(1, toPos(live))) * 1000)}
-        onChange={(e) => setLive(Math.min(props.max, Math.max(props.min, fromPos(Number(e.target.value) / 1000))))}
-        onPointerUp={commit}
-        onKeyUp={commit}
-        onBlur={commit}
+        value={Math.round(Math.max(0, Math.min(1, toPos(live))) * TRACK)}
+        onChange={(e) => { const v = fromPos(Number(e.target.value) / TRACK); setLive(v); setText(numText(v)); }}
+        onPointerUp={() => commit(live)}
+        onKeyUp={() => commit(live)}
+        onBlur={() => { if (live !== props.value) commit(live); }}
       />
+      <span className="st-range-ends">
+        <span aria-hidden>{numText(min)} {props.unit}</span>
+        {props.note && <b>{props.note(live)}</b>}
+        <span aria-hidden>{numText(max)} {props.unit}</span>
+      </span>
       {props.extra}
     </div>
   );

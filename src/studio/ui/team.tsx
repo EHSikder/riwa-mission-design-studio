@@ -13,7 +13,7 @@ import { ROLES, type RoleId } from '../model/types';
 import type { Player } from '../model/team';
 import { lanAddresses } from '../net/room';
 import { useStudio } from '../state';
-import { Lines, StatusBadge, fmt } from './controls';
+import { Lines, NumberBox, StatusBadge, fmt, numText } from './controls';
 
 // -------------------------------------------------------------------- who plays
 
@@ -302,8 +302,8 @@ export function AllocationsPanel({ a }: { a: Analysis }) {
                 <td><span className={`st-role-chip ${d}`}>{ROLES[d].short}</span></td>
                 {(['massKg', 'powerW', 'costM'] as (keyof Allocation)[]).map((k) => (
                   <td key={k}>
-                    <input type="number" step={k === 'costM' ? 0.1 : 1} disabled={!mine} value={Math.round(al[d][k] * 10) / 10} onChange={(e) => setOne(d, k, Number(e.target.value))} aria-label={`${ROLES[d].short} ${k}`} />
-                    <span className={`st-used ${u[d][k] > al[d][k] + 1e-6 ? 'over' : ''}`}>uses {Math.round(u[d][k] * 10) / 10}</span>
+                    <NumberBox label={`${ROLES[d].short} ${k}`} value={al[d][k]} min={0} disabled={!mine} onCommit={(v) => setOne(d, k, v)} />
+                    <span className={`st-used ${u[d][k] > al[d][k] + 1e-6 ? 'over' : ''}`}>uses {numText(u[d][k])}</span>
                   </td>
                 ))}
               </tr>

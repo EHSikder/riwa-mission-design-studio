@@ -235,6 +235,7 @@ export function Brief() {
           <RequirementsTable a={a} edit={(c) => edit('director', c)} hidePrediction />
         </fieldset>
         <div className="st-brief-go">
+          <span>You can change the goals and the ambition later, on the Mission desk.</span>
           <button type="button" className="st-primary big" data-guide="go-design-main" onClick={() => setPhase('design')}>Start designing →</button>
         </div>
       </div>

@@ -6,7 +6,7 @@
  */
 import type { JSX } from 'react';
 import {
-  ADCS, ANTENNAS, ARRAY_MOUNTS, BANDS, CELLS, COMPUTERS, LAUNCHERS, ORBIT_TYPES, PLATFORMS, PROPULSION, STATIONS, STORAGE_STEPS_GBIT,
+  ADCS, ANTENNAS, ARRAY_MOUNTS, BANDS, CELLS, COMPUTERS, LAUNCHERS, ORBIT_TYPES, PLATFORMS, PROPULSION, STATIONS,
   type AdcsId, type AntennaId, type ArrayMountId, type BandId, type CellId, type ComputerId, type LauncherId, type OrbitTypeId,
   type PlatformId, type PropulsionId, type StationId,
 } from '../model/catalog';
@@ -17,7 +17,7 @@ import { INSTRUMENTS, imagerAt, instrumentRateMbps, type InstrumentId } from '..
 import type { Requirement } from '../model/scenarios';
 import { TESTS, applicableTests, type TestId } from '../model/tests';
 import { ROLES, type RoleId } from '../model/types';
-import { Cards, GaugeBar, Info, Lines, Range, Section, Seg, StatusBadge, Toggle, fmt, type SectionState } from './controls';
+import { Cards, GaugeBar, Info, Lines, Range, Section, Seg, StatusBadge, Toggle, fmt, numText, type SectionState } from './controls';
 import { GroundTrack } from './GroundTrack';
 import { OrbitView } from './OrbitView';
 import { useSuggest } from './help';
@@ -29,7 +29,8 @@ export interface DeskProps {
 }
 
 const cmp = (r: Requirement) => (r.better === 'lower' ? '≤' : '≥');
-const ltanLabel = (h: number) => `${String(Math.floor(h)).padStart(2, '0')}:${h % 1 ? '30' : '00'}${h === 6 || h === 18 ? ' (dawn–dusk)' : ''}`;
+/** A time of day in hours as a clock reading (10.5 is 10:30). */
+const clock = (h: number) => { const m = Math.round(h * 60); return `${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`; };
 const stars = (v: number) => (v >= 0.9 ? '★★★' : v >= 0.6 ? '★★' : v >= 0.3 ? '★' : '');
 const chosen = (yes: boolean, fail = false): SectionState => (!yes ? 'todo' : fail ? 'fail' : 'done');
 const failsOn = (a: Analysis, re: RegExp) => a.issues.some((i) => i.level === 'fail' && re.test(i.text));
@@ -48,8 +49,12 @@ export function DeskHeader({ role }: { role: RoleId }) {
 }
 
 /** The sizing that real engineers do first: just enough, plus a margin. */
-export const sizeArrays = (a: Analysis) => Math.min(a.power.maxArrayM2, Math.max(0.05, Math.ceil(((a.power.requiredW * 1.15) / Math.max(1e-6, a.power.perM2W * a.power.ageing)) * 20) / 20));
-export const sizeBattery = (a: Analysis) => Math.max(10, Math.ceil((a.power.batteryNeedWh * 1.1) / 10) * 10);
+/** Arrays that cover the end-of-life need with JPL's 35% point-design power margin (no more than the platform holds). */
+export const sizeArrays = (a: Analysis) => Math.min(a.power.maxArrayM2, Number(Math.max(0.01, (a.power.requiredW * 1.35) / Math.max(1e-6, a.power.perM2W * a.power.ageing)).toPrecision(3)));
+/** A battery that keeps every shadow inside its allowed depth of discharge, with JPL's 35% energy margin. */
+export const sizeBattery = (a: Analysis) => Number(Math.max(1, a.power.batteryNeedWh * 1.1, (1.35 * a.power.eclipseWh) / Math.max(0.05, a.power.dodAllowed)).toPrecision(3));
+/** Storage for the data made between two contacts, plus a quarter (or `fallback` before any instrument is chosen). */
+export const sizeStorage = (a: Analysis, fallback = 8) => Number(Math.max(1, a.data.storageNeedGbit > 0 ? a.data.storageNeedGbit * 1.25 : fallback).toPrecision(3));
 
 // -------------------------------------------------------------------- mission
 export function ObjectivesPicker({ a, edit }: DeskProps) {
@@ -223,8 +228,7 @@ export function MissionDesk({ a, edit }: DeskProps) {
             value={d.orbit.altKm}
             min={ot.altKm[0]}
             max={ot.altKm[1]}
-            step={5}
-            format={(v) => `${v.toFixed(0)} km`}
+            unit="km"
             onCommit={(v) => edit((x) => { x.orbit.altKm = v; })}
             info="Lower: sharper pictures and stronger radio links, but each pass is shorter, the camera sees a narrower strip and air drag pulls the orbit down sooner."
           />
@@ -235,17 +239,22 @@ export function MissionDesk({ a, edit }: DeskProps) {
             value={d.orbit.incDeg}
             min={ot.incDeg[0]}
             max={ot.incDeg[1]}
-            step={1}
-            format={(v) => `${v.toFixed(0)}°`}
+            unit="°"
             onCommit={(v) => edit((x) => { x.orbit.incDeg = v; })}
             info="The orbit's tilt to the equator: the ground track reaches this latitude north and south. Angola lies between 4° and 18° south, so a tilt of ~20° passes over it far more often than a polar orbit."
           />
         )}
         {ot.ltanH && (
-          <div className="st-field">
-            <span className="st-field-label">Local time of the orbit <Info text="The local time at which the satellite crosses the equator. Late morning (10:30) gives good light with fewer afternoon clouds. Dawn–dusk orbits (06:00/18:00) ride the day–night line: almost never in shadow, ideal for power-hungry radar." /></span>
-            <Seg value={d.orbit.ltanH} label="Local time" options={ot.ltanH.map((h) => ({ value: h, label: ltanLabel(h) }))} onPick={(v) => edit((x) => { x.orbit.ltanH = v; })} />
-          </div>
+          <Range
+            label="Local time of the orbit"
+            value={d.orbit.ltanH}
+            min={Math.min(...ot.ltanH)}
+            max={Math.max(...ot.ltanH)}
+            unit="h"
+            note={(v) => `Crosses the equator at ${clock(v)} local time${Math.abs(v - 6) < 0.25 || Math.abs(v - 18) < 0.25 ? ' (dawn–dusk)' : ''}`}
+            onCommit={(v) => edit((x) => { x.orbit.ltanH = v; })}
+            info="The local time at which the satellite crosses the equator, in hours (10.5 is 10:30). Late morning gives good light with fewer afternoon clouds. Dawn–dusk orbits (6 or 18) ride the day–night line: almost never in shadow, ideal for power-hungry radar."
+          />
         )}
         {ot.lonDeg && (
           <Range
@@ -253,8 +262,8 @@ export function MissionDesk({ a, edit }: DeskProps) {
             value={d.orbit.lonDeg}
             min={ot.lonDeg[0]}
             max={ot.lonDeg[1]}
-            step={1}
-            format={(v) => `${Math.abs(v).toFixed(0)}° ${v >= 0 ? 'E' : 'W'}`}
+            unit="° east"
+            note={(v) => (v < 0 ? `${numText(-v)}° west of Greenwich` : `${numText(v)}° east of Greenwich`)}
             onCommit={(v) => edit((x) => { x.orbit.lonDeg = v; })}
             info="The longitude the satellite hangs above. Close to your customers' longitude puts it high in their sky, above buildings and hills."
           />
@@ -301,8 +310,8 @@ export function MissionDesk({ a, edit }: DeskProps) {
         <TestCampaign a={a} edit={edit} />
       </Section>
       {!a.crew && (
-        <Section id="length" title="Mission length" state="done" right={`${d.plannedYears.toFixed(1)} years`} info="Years of operations you plan and pay for. The spacecraft must also survive that long: battery wear, radiation, propellant and orbit decay all count down.">
-          <Range label="Planned operations" value={d.plannedYears} min={1} max={d.orbit.type === 'geo' ? 20 : 10} step={0.5} format={(v) => `${v.toFixed(1)} years`} onCommit={(v) => edit((x) => { x.plannedYears = v; })} />
+        <Section id="length" title="Mission length" state="done" right={`${numText(d.plannedYears)} years`} info="Years of operations you plan and pay for. The spacecraft must also survive that long: battery wear, radiation, propellant and orbit decay all count down.">
+          <Range label="Planned operations" value={d.plannedYears} min={0.25} max={d.orbit.type === 'geo' ? 20 : 10} unit="years" onCommit={(v) => edit((x) => { x.plannedYears = v; })} />
         </Section>
       )}
     </>
@@ -362,15 +371,14 @@ export function SpacecraftDesk({ a, edit }: DeskProps) {
             <Range
               label="Array area"
               value={d.arrayM2}
-              min={0.05}
-              max={Math.max(0.1, a.power.maxArrayM2)}
+              min={0.01}
+              max={Math.max(0.02, a.power.maxArrayM2)}
               log
-              step={0.05}
-              format={(v) => `${v.toFixed(v < 1 ? 2 : 1)} m²`}
+              unit="m²"
               onCommit={(v) => edit((x) => { x.arrayM2 = v; })}
               extra={
                 <button type="button" className="st-link" data-suggest={sug && a.resources.power.gauge?.zone !== 'right' ? '1' : undefined} onClick={() => edit((x) => { x.arrayM2 = sizeArrays(a); })}>
-                  Size it for me (just enough + 15%)
+                  Size it for me (just enough + 35%, JPL's point-design margin)
                 </button>
               }
             />
@@ -393,13 +401,12 @@ export function SpacecraftDesk({ a, edit }: DeskProps) {
             <Range
               label="Capacity"
               value={d.batteryWh}
-              min={10}
+              min={1}
               max={30_000}
               log
-              step={5}
-              format={fmt.wh}
+              unit="Wh"
               onCommit={(v) => edit((x) => { x.batteryWh = v; })}
-              extra={<button type="button" className="st-link" onClick={() => edit((x) => { x.batteryWh = sizeBattery(a); })}>Size it for me</button>}
+              extra={<button type="button" className="st-link" onClick={() => edit((x) => { x.batteryWh = sizeBattery(a); })}>Size it for me (every shadow covered + 35%)</button>}
             />
             <div className="st-facts two">
               <div><span>Energy used per eclipse</span><b>{fmt.wh(a.power.eclipseWh)}</b></div>
@@ -443,7 +450,7 @@ export function SpacecraftDesk({ a, edit }: DeskProps) {
         />
         {a.dv.lines.length > 0 && <Lines lines={a.dv.lines} format={(v) => `${v.toFixed(0)} m/s`} total={{ name: 'Total Δv', value: a.dv.totalMs }} />}
         {(adv || crew) && (
-          <Range label="Extra propellant" value={d.propellantMarginPct} min={0} max={50} step={1} format={(v) => `+${v.toFixed(0)}%`} onCommit={(v) => edit((x) => { x.propellantMarginPct = v; })} info="Propellant beyond the budget: a margin for surprises, or a longer life. For a crew it is the way home." />
+          <Range label="Extra propellant" value={d.propellantMarginPct} min={0} max={100} unit="%" onCommit={(v) => edit((x) => { x.propellantMarginPct = v; })} info="Propellant beyond the budget: a margin for surprises, or a longer life. For a crew it is the way home." />
         )}
       </Section>
       {crew && (
@@ -489,7 +496,7 @@ function CrewSystems({ a, edit }: DeskProps) {
       <span className="st-field-label">Life support <Info text="Takes away the carbon dioxide the crew breathes out and gives back oxygen, water and a comfortable cabin." /></span>
       <Cards columns={1} value={c.eclss} suggest={sug?.crew?.eclss} onPick={(v: EclssId) => set({ eclss: v })}
         options={(Object.keys(ECLSS) as EclssId[]).map((k) => ({ value: k, title: ECLSS[k].name, lines: [ECLSS[k].explain, `${fmt.kg(ECLSS[k].hardwareKg)} + ${ECLSS[k].kgPerCrewDay} kg per person per day · ${fmt.m(ECLSS[k].costM)} · ${ECLSS[k].devMonths} months`] }))} />
-      <Range label="Spare days of air, water and food" value={c.marginDays} min={0} max={10} step={1} format={(v) => `${v.toFixed(0)} days`} onCommit={(v) => set({ marginDays: v })} info="If the splashdown is delayed or something leaks, these are the days the crew lives on." />
+      <Range label="Spare days of air, water and food" value={c.marginDays} min={0} max={15} unit="days" onCommit={(v) => set({ marginDays: v })} info="If the splashdown is delayed or something leaks, these are the days the crew lives on." />
       <span className="st-field-label">Storm shelter <Info text="Beyond Earth's magnetic field a solar storm can deliver months of radiation in hours. Mass between the crew and the Sun is the only protection." /></span>
       <Cards columns={1} value={c.shelter} suggest={sug?.crew?.shelter} onPick={(v: ShelterId) => set({ shelter: v })}
         options={(Object.keys(SHELTERS) as ShelterId[]).map((k) => ({ value: k, title: SHELTERS[k].name, lines: [SHELTERS[k].explain, `${fmt.kg(SHELTERS[k].massKg)} · ${fmt.m(SHELTERS[k].costM)} · a big storm gives ${SHELTERS[k].stormMsv} mSv`] }))} />
@@ -583,7 +590,7 @@ export function CommsDesk({ a, edit }: DeskProps) {
         <Seg label="Band" value={d.band} suggest={sug?.band} onPick={(v: BandId) => edit((x) => { x.band = v; if (v === 'UHF' && x.antenna === 'dish') x.antenna = 'patch'; })} options={(Object.keys(BANDS) as BandId[]).map((b) => ({ value: b, label: b }))} />
         <p className="st-sub">{BANDS[d.band].name}: up to {fmt.mbps(BANDS[d.band].capMbps)} with the best radios.</p>
       </Section>
-      <Section id="antenna" title="Antenna" state={chosen(d.antenna !== 'none')} right={d.antenna === 'none' ? 'none yet' : d.antenna === 'dish' ? `${d.dishM.toFixed(2)} m dish` : ANTENNAS[d.antenna].name} info={ANTENNAS[d.antenna].explain}>
+      <Section id="antenna" title="Antenna" state={chosen(d.antenna !== 'none')} right={d.antenna === 'none' ? 'none yet' : d.antenna === 'dish' ? `${numText(d.dishM)} m dish` : ANTENNAS[d.antenna].name} info={ANTENNAS[d.antenna].explain}>
         <Cards
           columns={3}
           value={d.antenna}
@@ -592,16 +599,35 @@ export function CommsDesk({ a, edit }: DeskProps) {
           options={(Object.keys(ANTENNAS) as AntennaId[]).filter((k) => k !== 'none').map((k) => ({ value: k, title: ANTENNAS[k].name, disabled: k === 'dish' && d.band === 'UHF' }))}
         />
         {d.antenna === 'dish' && (
-          <Range label="Dish diameter" value={d.dishM} min={0.2} max={Math.max(0.3, p.maxDishM)} step={0.05} format={(v) => `${v.toFixed(2)} m`} onCommit={(v) => edit((x) => { x.dishM = v; })} info="Twice the diameter, four times the signal, but the beam gets twice as narrow: harder to keep on Earth." />
+          <Range label="Dish diameter" value={d.dishM} min={0.1} max={Math.max(0.2, p.maxDishM)} unit="m" onCommit={(v) => edit((x) => { x.dishM = v; })} info="Twice the diameter, four times the signal, but the beam gets twice as narrow: harder to keep on Earth." />
         )}
         {a.resources.comms.gauge && <GaugeBar g={a.resources.comms.gauge} open />}
       </Section>
-      <Section id="tx" title="Transmitter" state="done" right={`${d.txW.toFixed(d.txW < 10 ? 1 : 0)} W`} info="Radio power in watts. Doubling it doubles the data rate (when the link is limited by distance), and doubles the electricity it eats while transmitting.">
-        <Range label="Radiated power" value={d.txW} min={0.5} max={200} log step={0.5} format={(v) => `${v.toFixed(v < 10 ? 1 : 0)} W`} onCommit={(v) => edit((x) => { x.txW = v; })} />
+      <Section id="tx" title="Transmitter" state="done" right={`${numText(d.txW)} W`} info="Radio power in watts. Doubling it doubles the data rate (when the link is limited by distance), and doubles the electricity it eats while transmitting.">
+        <Range label="Radiated power" value={d.txW} min={0.1} max={200} log unit="W" onCommit={(v) => edit((x) => { x.txW = v; })} />
       </Section>
-      <Section id="storage" title="Onboard storage" state={chosen(d.storageGbit > 0)} right={d.storageGbit > 0 ? (d.storageGbit >= 1024 ? `${d.storageGbit / 1024} Tbit` : `${d.storageGbit} Gbit`) : 'none yet'} info="Holds the data between contacts with the ground. Too little and data is overwritten before it can be sent.">
-        <Seg label="Storage" value={d.storageGbit} suggest={sug?.storageGbit} onPick={(v) => edit((x) => { x.storageGbit = v; })} options={STORAGE_STEPS_GBIT.map((g) => ({ value: g as number, label: g >= 1024 ? `${g / 1024} Tbit` : `${g} Gbit` }))} />
-        <p className="st-sub">Needed between contacts: {fmt.gbit(a.data.storageNeedGbit)}.</p>
+      <Section id="storage" title="Onboard storage" state={chosen(d.storageGbit > 0)} right={d.storageGbit > 0 ? (d.storageGbit >= 1024 ? `${numText(d.storageGbit / 1024)} Tbit` : `${numText(d.storageGbit)} Gbit`) : 'none yet'} info="Holds the data between contacts with the ground. Too little and data is overwritten before it can be sent.">
+        {d.storageGbit <= 0 ? (
+          <div className="st-empty-act">
+            <p>No storage yet: data taken between contacts has nowhere to wait.{a.data.storageNeedGbit > 0 ? <> About <b>{fmt.gbit(a.data.storageNeedGbit)}</b> piles up between contacts.</> : null}</p>
+            <button type="button" className="st-primary" data-suggest={sug ? '1' : undefined} data-sfx="add" onClick={() => edit((x) => { x.storageGbit = sizeStorage(a, sug?.storageGbit); })}>Add storage, sized for me</button>
+          </div>
+        ) : (
+          <>
+            <Range
+              label="Capacity"
+              value={d.storageGbit}
+              min={1}
+              max={16_384}
+              log
+              unit="Gbit"
+              note={(v) => (v >= 1024 ? `${numText(v / 1024)} Tbit` : '')}
+              onCommit={(v) => edit((x) => { x.storageGbit = v; })}
+              extra={<button type="button" className="st-link" onClick={() => edit((x) => { x.storageGbit = sizeStorage(a); })}>Size it for me (what piles up between contacts + 25%)</button>}
+            />
+            <p className="st-sub">Needed between contacts: {fmt.gbit(a.data.storageNeedGbit)}.</p>
+          </>
+        )}
       </Section>
       <Section id="stations" title={deep ? 'Deep-space antennas' : 'Ground stations'} state={chosen(d.stations.length > 0)} right={stations || 'nobody listening'} info={deep ? 'Only giant dishes can hear a spacecraft at the Moon or Mars. You rent their time by the hour.' : 'Each station hears the satellite only while it passes overhead, a few minutes at a time. More stations, more contact time, more yearly fees.'}>
         <Cards
@@ -625,7 +651,7 @@ export function CommsDesk({ a, edit }: DeskProps) {
           })}
         />
         {deep && (
-          <Range label="Antenna time bought" value={d.trackHoursPerDay} min={1} max={24} step={1} format={(v) => `${v.toFixed(0)} h a day`} onCommit={(v) => edit((x) => { x.trackHoursPerDay = v; })} info="Hours a day a ground antenna listens. Each hour costs money; every hour without one, the spacecraft talks to no one." />
+          <Range label="Antenna time bought" value={d.trackHoursPerDay} min={0.5} max={24} unit="h a day" onCommit={(v) => edit((x) => { x.trackHoursPerDay = v; })} info="Hours a day a ground antenna listens. Each hour costs money; every hour without one, the spacecraft talks to no one." />
         )}
       </Section>
       {d.antenna !== 'none' && d.stations.length > 0 && (
@@ -654,7 +680,7 @@ export function ResourcesDesk({ a, edit }: DeskProps) {
         <Lines lines={a.cost.lines} format={fmt.m} total={{ name: 'Total', value: a.cost.totalM }} />
       </Section>
       <Section id="reserve" title="Reserve and insurance" state={d.reservePct < 10 ? 'warn' : 'done'} right={`${d.reservePct.toFixed(0)}% reserve${d.insurance ? ' · insured' : ''}`} info="Real projects keep 15–30% of the development cost in reserve: parts arrive late, tests find problems. Insurance pays back if the launch or the first year fails.">
-        <Range label="Management reserve" value={d.reservePct} min={0} max={40} step={1} format={(v) => `${v.toFixed(0)}% (${fmt.m((v / 100) * a.cost.developmentM)})`} onCommit={(v) => edit((x) => { x.reservePct = v; })} />
+        <Range label="Management reserve" value={d.reservePct} min={0} max={50} unit="%" note={(v) => `${fmt.m((v / 100) * a.cost.developmentM)} of the development cost`} onCommit={(v) => edit((x) => { x.reservePct = v; })} />
         <Toggle label="Insure the launch and first year (8% of value)" value={d.insurance} onChange={(v) => edit((x) => { x.insurance = v; })} />
       </Section>
       <Section id="masslines" title="Mass" right={fmt.kg(a.mass.wetKg)} info="Everything the rocket lifts. Growth allowance is extra weight new designs always gain before they fly.">
